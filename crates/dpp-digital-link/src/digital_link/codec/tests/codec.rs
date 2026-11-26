@@ -1,5 +1,6 @@
 //! Tests of the `codec` module.
 
+use super::super::super::error::DigitalLinkError;
 use super::super::*;
 
 #[test]

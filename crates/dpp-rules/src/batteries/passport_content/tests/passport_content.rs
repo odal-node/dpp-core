@@ -1,5 +1,6 @@
 //! Tests of the `passport_content` module.
 
+use super::super::super::battery_facts::BatteryFacts;
 use super::super::super::due_diligence::{
     DUE_DILIGENCE_REQUIRED_FROM, DueDiligenceSecondLife, OperatorScope,
 };

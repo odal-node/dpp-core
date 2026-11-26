@@ -1,5 +1,6 @@
 //! Tests of the `battery` module.
 
+use super::super::super::LintSeverity;
 use super::super::*;
 
 fn base_input() -> BatteryLintInput<'static> {

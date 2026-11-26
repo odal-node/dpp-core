@@ -4,6 +4,7 @@
 // Regulation (EU) 2023/1542 Art. 8(2) and 8(3), not a roadmap.
 
 use super::super::*;
+use crate::common::date::CalendarDate;
 
 fn all_metals(co: f64, pb: f64, li: f64, ni: f64) -> RecycledContentInput {
     RecycledContentInput {

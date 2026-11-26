@@ -1,6 +1,9 @@
 //! Tests of the `calculator` module.
 
+use super::super::super::parameters::RepairabilityInputs;
 use super::super::*;
+use crate::clock::AssessmentClock;
+use crate::error::CalcError;
 use crate::repairability::thresholds::SimplifiedRepairabilityHeuristic;
 use chrono::NaiveDate;
 

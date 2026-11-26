@@ -1,7 +1,7 @@
 //! RFC 8785's own examples, checked against the canonicaliser every signature
 //! and content hash here is made over.
 //!
-//! The tests beside `canonical.rs` compare [`canonicalize`] with what its author
+//! The tests beside `canonical/` compare [`canonicalize`] with what its author
 //! expected, and the expectation was written next to the code. A shared
 //! misreading would pass all of them: a number formatted a little differently, or
 //! keys ordered by UTF-8 bytes instead of UTF-16 code units. The result would be

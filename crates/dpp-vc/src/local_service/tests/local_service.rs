@@ -3,6 +3,7 @@
 use super::super::*;
 use dpp_crypto::keystore::KeyStore;
 use dpp_domain::PassportId;
+use dpp_domain::ports::identity::IdentityPort;
 use std::sync::Arc;
 
 fn service() -> LocalIdentityService {

@@ -1,6 +1,7 @@
 //! Tests of the `clock` module.
 
 use super::super::*;
+use chrono::{DateTime, NaiveDate, Utc};
 
 #[test]
 fn placed_on_takes_the_law_date_from_the_caller_not_the_clock() {

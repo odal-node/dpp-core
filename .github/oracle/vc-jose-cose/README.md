@@ -63,7 +63,7 @@ stderr. The process then exits 0: a refusal is the right answer to a row that ex
   at issuance, which is what row 5 expects.
 - **The paths.** `--sd` is a JSON array of the suite's dotted paths, with `[n]` for one
   array element: `credentialSubject.phoneNumbers[0]`. The harness turns each into the
-  library's `ClaimPath` (`crates/dpp-tests/src/bin/vc_jose_cose_suite/paths.rs`), because the library has no string syntax of its
+  library's `ClaimPath` (`crates/dpp-tests/src/bin/vc_jose_cose_suite/paths/claim_path.rs`), because the library has no string syntax of its
   own. A path that is not in that syntax is an unusable input, not a verdict, and so is
   `--sd` given to a verification or to a JOSE feature, even as `[]`. An SD-JWT issuance
   without `--sd` conceals nothing.

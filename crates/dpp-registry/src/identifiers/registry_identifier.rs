@@ -1,0 +1,600 @@
+//! The identifiers a registration carries: product, facility, operator and provider.
+
+use dpp_domain::{ActorIdentifier, ActorIdentifierError, ActorPosition, Gln, Gtin};
+use serde::{Deserialize, Serialize};
+
+use crate::basis::RegistryBasis;
+use crate::error::RegistryValidationError;
+
+fn validate_country_code(code: &str) -> Result<(), RegistryValidationError> {
+    if code.is_empty() {
+        // `country` is a non-optional Annex III field; an empty value is a
+        // missing mandatory identifier, not an acceptable "unknown".
+        return Err(RegistryValidationError::MissingRequiredField(
+            "country".into(),
+        ));
+    }
+    if dpp_rules::country_code_valid(code) {
+        Ok(())
+    } else {
+        Err(RegistryValidationError::InvalidCountryCode {
+            code: code.to_owned(),
+        })
+    }
+}
+
+/// Unique product identifier — identifies the product model/type.
+///
+/// Typically a GTIN-14 or similar standardised product code. The EU registry
+/// uses this to group all items of the same product under one entry.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct ProductIdentifier {
+    /// The identifier scheme (e.g. `"gtin"`, `"gln"`, `"did"`).
+    pub scheme: String,
+    /// The identifier value (e.g. `"09506000134352"`).
+    pub value: String,
+    /// Optional human-readable label.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub label: Option<String>,
+}
+
+impl ProductIdentifier {
+    /// Validate the identifier by scheme.
+    ///
+    /// - `"gtin"`: value must be a structurally valid GTIN-14 (14 digits, mod-10 check).
+    /// - Other schemes: no structural validation (formats vary; validate when EU spec is published).
+    ///
+    /// 🚨 Every scheme still requires a **value**. "No structural validation"
+    /// used to mean no check at all, so a blank identifier under any scheme but
+    /// `"gtin"` passed — identifying nothing while looking valid.
+    pub fn validate(&self) -> Result<(), RegistryValidationError> {
+        if self.value.trim().is_empty() {
+            return Err(RegistryValidationError::MissingRequiredField(
+                "productId.value".into(),
+            ));
+        }
+        if self.scheme == "gtin" {
+            Gtin::parse(&self.value).map(|_| ()).map_err(|e| {
+                RegistryValidationError::InvalidGtin {
+                    value: self.value.clone(),
+                    reason: format!("{e:?}"),
+                }
+            })?;
+        }
+        Ok(())
+    }
+}
+
+/// Product item identifier — identifies an individual serialised unit.
+///
+/// For serialised products (batteries with serial numbers, individual garments
+/// with SGTIN), this distinguishes one physical item from another.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct ProductItemIdentifier {
+    /// The identifier scheme (e.g. `"sgtin"`, `"serial"`, `"batch+serial"`).
+    pub scheme: String,
+    /// The identifier value.
+    pub value: String,
+    /// Batch or lot number, if applicable.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub batch_id: Option<String>,
+}
+
+impl ProductItemIdentifier {
+    /// Validate the item identifier: `scheme` and `value` must both be
+    /// non-blank. Scheme-specific structural checks (SGTIN layout, etc.) are
+    /// deferred until the EU fixes item-identifier formats.
+    ///
+    /// The only one of the four that already required both — it checked
+    /// `is_empty` rather than trimming, so `" "` passed. That is the form a
+    /// trimmed-input bug produces, and the one `is_empty` alone cannot see.
+    pub fn validate(&self) -> Result<(), RegistryValidationError> {
+        if self.scheme.trim().is_empty() {
+            return Err(RegistryValidationError::MissingRequiredField(
+                "itemId.scheme".into(),
+            ));
+        }
+        if self.value.trim().is_empty() {
+            return Err(RegistryValidationError::MissingRequiredField(
+                "itemId.value".into(),
+            ));
+        }
+        Ok(())
+    }
+}
+
+/// Facility identifier — identifies the manufacturing or assembly facility.
+///
+/// Used for market surveillance to trace products back to their physical
+/// origin. Must match the facility registered under the economic operator.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct FacilityIdentifier {
+    /// The facility code scheme (e.g. `"gln"`, `"lei"`, `"national"`).
+    pub scheme: String,
+    /// The facility identifier value.
+    pub value: String,
+    /// Human-readable facility name.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
+    /// ISO 3166-1 alpha-2 country code where the facility is located.
+    pub country: String,
+    /// Street address or location description.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub address: Option<String>,
+}
+
+impl FacilityIdentifier {
+    /// Validate the facility identifier.
+    ///
+    /// Checks the country code and, when `scheme == "gln"`, that the value is a
+    /// structurally valid GS1 GLN (13 digits, mod-10 check). Other schemes
+    /// (`"lei"`, `"national"`, …) are not structurally verified here.
+    ///
+    /// 🚨 All of them still require a **value** — Annex III point (i) makes the
+    /// facility identifier registration data, and a blank one under
+    /// `"national"` is not a facility identified by a scheme this crate cannot
+    /// check, it is no facility at all.
+    pub fn validate(&self) -> Result<(), RegistryValidationError> {
+        validate_country_code(&self.country)?;
+        if self.value.trim().is_empty() {
+            return Err(RegistryValidationError::MissingRequiredField(
+                "facilityId.value".into(),
+            ));
+        }
+        if self.scheme == "gln" {
+            Gln::parse(&self.value).map(|_| ()).map_err(|e| {
+                RegistryValidationError::InvalidGln {
+                    value: self.value.clone(),
+                    reason: format!("{e:?}"),
+                }
+            })?;
+        }
+        Ok(())
+    }
+
+    /// This identifier read as an EN 18219 clause 6 identifier.
+    ///
+    /// A `gln` is a scheme 7 GLN qualified as a **physical location** (AI 414), and
+    /// an `lei` or a `duns` is scheme 6. Anything else is
+    /// [`ActorIdentifierError::Unmapped`], including `national`, which names no
+    /// scheme at all. That is not a validation failure: [`validate`](Self::validate)
+    /// is unchanged.
+    ///
+    /// # Errors
+    ///
+    /// See [`ActorIdentifier::from_legacy`].
+    pub fn actor_identifier(&self) -> Result<ActorIdentifier, ActorIdentifierError> {
+        ActorIdentifier::from_legacy(&self.scheme, &self.value, ActorPosition::Facility)
+    }
+
+    /// Require this identifier to follow an EN 18219 clause 6 scheme, as a
+    /// registration does. See
+    /// [`OperatorIdentifier::require_clause_6`] for why this is not part of
+    /// [`validate`](Self::validate).
+    ///
+    /// # Errors
+    ///
+    /// [`RegistryValidationError::NoClause6Route`] for a scheme this build cannot
+    /// place, such as `national`. When it can place the scheme and the value
+    /// does not fit it, [`RegistryValidationError::InvalidGln`] for a GLN and
+    /// [`RegistryValidationError::InvalidFacilityId`] for an LEI or a D-U-N-S
+    /// number.
+    pub fn require_clause_6(&self) -> Result<(), RegistryValidationError> {
+        match self.actor_identifier() {
+            Ok(_) => Ok(()),
+            Err(ActorIdentifierError::Unmapped { scheme }) => {
+                Err(RegistryValidationError::NoClause6Route {
+                    subject: "facility",
+                    scheme,
+                })
+            }
+            Err(ActorIdentifierError::InvalidGln { reason, .. }) => {
+                Err(RegistryValidationError::InvalidGln {
+                    value: self.value.clone(),
+                    reason,
+                })
+            }
+            Err(_) => Err(RegistryValidationError::InvalidFacilityId {
+                scheme: self.scheme.clone(),
+                value: self.value.clone(),
+            }),
+        }
+    }
+}
+
+/// Economic operator identifier — identifies the responsible legal entity.
+///
+/// This is the entity accountable for the DPP under ESPR. When a transfer
+/// of responsibility occurs, the registry record is updated to reflect the
+/// new operator.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct OperatorIdentifier {
+    /// The operator identifier scheme (e.g. `"vat"`, `"lei"`, `"eori"`, `"did"`).
+    pub scheme: String,
+    /// The identifier value (e.g. EU VAT number, LEI code).
+    pub value: String,
+    /// Legal entity name.
+    pub name: String,
+    /// ISO 3166-1 alpha-2 country of registration.
+    pub country: String,
+    /// DID of the operator, if available (for VC-based authentication).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub did: Option<String>,
+}
+
+impl OperatorIdentifier {
+    /// Validate the operator identifier.
+    ///
+    /// Checks that `name` is present, then the country code, then applies a
+    /// per-scheme structural or checksum check (see `validate_operator_scheme`).
+    pub fn validate(&self) -> Result<(), RegistryValidationError> {
+        if self.name.is_empty() {
+            return Err(RegistryValidationError::MissingRequiredField(
+                "operatorId.name".into(),
+            ));
+        }
+        // An identifier with no scheme is not identifiable: the value alone does
+        // not say whether it is a VAT number, an LEI or a DID. Refused here
+        // because the per-scheme check below accepts any unrecognised scheme —
+        // including the empty one — so without this an unscheme'd identifier
+        // would pass validation and be submitted as if it were well-formed.
+        if self.scheme.trim().is_empty() {
+            return Err(RegistryValidationError::MissingRequiredField(
+                "operatorId.scheme".into(),
+            ));
+        }
+        validate_country_code(&self.country)?;
+        validate_operator_scheme(&self.scheme, &self.value)
+    }
+
+    /// This identifier read as an EN 18219 clause 6 identifier: which of the
+    /// clause 6 schemes the `(scheme, value)` pair is.
+    ///
+    /// `lei` and `duns` are scheme 6, and a `gln` is a scheme 7 party GLN. Anything
+    /// else is [`ActorIdentifierError::Unmapped`], which is **not** a validation
+    /// failure: [`validate`](Self::validate) is unchanged and still accepts an
+    /// `eori`, a `vat` and a `did`, because no rule yet says an identifier must
+    /// have a clause 6 route.
+    ///
+    /// The [`did`](Self::did) field is the operator's DID for authentication and
+    /// is not the identifier, so it plays no part here.
+    ///
+    /// # Errors
+    ///
+    /// See [`ActorIdentifier::from_legacy`].
+    pub fn actor_identifier(&self) -> Result<ActorIdentifier, ActorIdentifierError> {
+        ActorIdentifier::from_legacy(&self.scheme, &self.value, ActorPosition::Operator)
+    }
+
+    /// Require this identifier to follow an EN 18219 clause 6 scheme, as a
+    /// registration does.
+    ///
+    /// 🚨 This is the one place [`actor_identifier`](Self::actor_identifier)'s
+    /// `Unmapped` becomes a refusal, and it is not applied to
+    /// [`validate`](Self::validate): an `eori` or a `vat` identifier is well formed
+    /// and `validate` has always accepted it. Clause 6.1 asks for a clause 6
+    /// scheme where regulation requires the identifier, and a registration is where
+    /// the operator identifier is required. A proof of registration the registry
+    /// *sent* is not held to it, since refusing the registry's own data would be
+    /// refusing a document nobody here can rewrite.
+    ///
+    /// # Errors
+    ///
+    /// [`RegistryValidationError::NoClause6Route`] for a scheme this build cannot
+    /// place, and [`RegistryValidationError::InvalidOperatorId`] when it can place
+    /// the scheme and the value does not fit it.
+    pub fn require_clause_6(&self) -> Result<(), RegistryValidationError> {
+        match self.actor_identifier() {
+            Ok(_) => Ok(()),
+            Err(ActorIdentifierError::Unmapped { scheme }) => {
+                Err(RegistryValidationError::NoClause6Route {
+                    subject: "operator",
+                    scheme,
+                })
+            }
+            Err(_) => Err(RegistryValidationError::InvalidOperatorId {
+                scheme: self.scheme.clone(),
+                value: self.value.clone(),
+            }),
+        }
+    }
+}
+
+/// Per-scheme structural/checksum validation of an economic-operator identifier.
+///
+/// - `lei`  — ISO 17442: 20 alphanumerics with an ISO 7064 MOD 97-10 check digit.
+/// - `eori` — 2-letter country prefix + 1..=15 alphanumerics.
+/// - `vat`  — 2-letter country prefix + alphanumerics (member-state check digits
+///   are **not** enforced; formats vary).
+/// - `duns` — exactly 9 digits.
+/// - `did`  — a DID; not structurally verified here (the crypto layer validates it).
+/// - any other scheme — accepted but **not** structurally verified.
+fn validate_operator_scheme(scheme: &str, value: &str) -> Result<(), RegistryValidationError> {
+    // 🚨 Before the per-scheme match, so it holds for `"did"` and for every
+    // scheme added later.
+    //
+    // Not verifying a scheme's *structure* must not also mean not noticing
+    // there is no value. This returned `true` for `"did"` and for anything
+    // unlisted regardless of `value`, so a blank identifier passed and was
+    // submitted as though it identified someone — and an empty operator
+    // identifier only failed under `"vat"` because `has_country_prefix` happens
+    // to reject one. Whether an absent value was caught depended on which
+    // scheme the operator was configured with.
+    //
+    // Whitespace counts. `" "` identifies no more than `""` and is the form a
+    // trimmed-input bug produces, which `is_empty` alone would pass.
+    if value.trim().is_empty() {
+        return Err(RegistryValidationError::InvalidOperatorId {
+            scheme: scheme.to_owned(),
+            value: value.to_owned(),
+        });
+    }
+    let ok = match scheme {
+        "lei" => dpp_rules::common::identifier::is_valid_lei(value),
+        "eori" => has_country_prefix(value, 15),
+        "vat" => has_country_prefix(value, usize::MAX),
+        "duns" => dpp_rules::common::identifier::is_duns(value),
+        // "did" and unknown schemes are accepted without structural
+        // verification — but never without a value. See the check above.
+        _ => true,
+    };
+    if ok {
+        Ok(())
+    } else {
+        Err(RegistryValidationError::InvalidOperatorId {
+            scheme: scheme.to_owned(),
+            value: value.to_owned(),
+        })
+    }
+}
+
+/// Two-letter country prefix followed by 1..=`max_body` alphanumeric characters.
+fn has_country_prefix(s: &str, max_body: usize) -> bool {
+    let b = s.as_bytes();
+    s.len() >= 3
+        && b[0].is_ascii_uppercase()
+        && b[1].is_ascii_uppercase()
+        && (s.len() - 2) <= max_body
+        && s[2..]
+            .bytes()
+            .all(|c| c.is_ascii_uppercase() || c.is_ascii_digit())
+}
+
+/// The digital product passport service provider hosting the back-up copy —
+/// ESPR Annex III point **(l)**.
+///
+/// ✅ COMPLIANCE-PIN: Regulation (EU) 2024/1781 Annex III(l), verbatim — *"the
+/// reference of the digital product passport service provider hosting the
+/// back-up copy of the digital product passport."* Commission Implementing
+/// Regulation (EU) 2026/1778 **Art. 8(9)(c)** makes it registration data the
+/// Commission stores: *"where relevant, reference to the digital product
+/// passport service provider"*.
+///
+/// # A reference, not an identifier, and the distinction is the act's
+///
+/// Annex III's second paragraph subjects the data carrier, the unique product
+/// identifier of point (b), the operator identifiers of points (g), (h) and (k)
+/// and the facility identifiers of point (i) to ISO/IEC 15459 conformity.
+/// **Point (l) is not in that list.** No scheme is mandated for it, and
+/// [Art. 2(32)](https://eur-lex.europa.eu/eli/reg/2024/1781/oj) imposes none on
+/// the role either — a provider is *"an independent third-party authorised by
+/// the economic operator"*, which is a legal relationship rather than a
+/// registration.
+///
+/// So this carries a **name**, which is what makes the reference a reference,
+/// and an optional scheme/value pair for providers that do hold a registry
+/// identifier. Requiring a scheme would invent a conformity rule the annex
+/// deliberately does not impose.
+///
+/// 🚨 **A provider is verified, and verification still yields no identifier to
+/// reuse.** IR (EU) 2026/1778 recital 4 names the role among value chain actors
+/// — *"each economic operator and value chain actor (such as digital product
+/// passport service provider, repairer, refurbisher, remanufacturer, recycler)
+/// should be identified through a verification process"* — so **Art. 5** governs
+/// it: a legal person obtains verified status by proving identity and
+/// establishment with a qualified electronic seal or a qualified electronic
+/// attestation of attributes. Art. 3(f) then has the registry holding *"a list
+/// of verified digital product passport service providers"*.
+///
+/// That produces a **status evidenced by a seal**, not a namespace. Art. 5 names
+/// the evidence and assigns nothing, so a design reaching for a registry-issued
+/// provider identifier would still be inventing one — and Art. 5(4) caps
+/// verified status at the expiry of the electronic identification means or three
+/// years from verification, whichever comes first, so a reference records who
+/// was named rather than asserting they are verified today.
+///
+/// # Why it is not the back-up URL
+///
+/// `RegistrationPayload::backup_url` is a location; this is the party. IR
+/// 2026/1778 lists them in consecutive paragraphs — Art. 8(7)(e) confirms
+/// *"the link to the back-up hosted by a digital product passport service
+/// provider"*, Art. 8(9)(c) stores the reference to the provider — and a URL
+/// cannot stand in for the other. Two providers can serve from one domain, one
+/// provider can serve from many, and a provider can be engaged with no link
+/// declared to the registry at all.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct ServiceProviderReference {
+    /// The provider's legal name.
+    ///
+    /// Required: a reference that names nobody references nothing, and the name
+    /// is the only element Annex III(l) can be read to compel.
+    pub name: String,
+    /// The identifier scheme, where the provider holds one — `"vat"`, `"lei"`,
+    /// `"eori"`, `"duns"`, `"did"`, as for an economic operator.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub scheme: Option<String>,
+    /// The identifier value under [`scheme`](Self::scheme).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub value: Option<String>,
+    /// ISO 3166-1 alpha-2 country of establishment, where known.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub country: Option<String>,
+}
+
+impl ServiceProviderReference {
+    /// A reference carrying only the provider's name.
+    ///
+    /// The floor Annex III(l) sets, and lawful on its own because the annex
+    /// mandates no scheme for point (l).
+    #[must_use]
+    pub fn named(name: impl Into<String>) -> Self {
+        Self {
+            name: name.into(),
+            scheme: None,
+            value: None,
+            country: None,
+        }
+    }
+
+    /// Validate the reference.
+    ///
+    /// # Errors
+    ///
+    /// [`RegistryValidationError::MissingRequiredField`] if the name is empty,
+    /// or if a scheme and a value do not arrive together;
+    /// [`RegistryValidationError::InvalidCountryCode`] if a country is present
+    /// and is not ISO 3166-1 alpha-2; and whatever the per-scheme check refuses.
+    pub fn validate(&self) -> Result<(), RegistryValidationError> {
+        if self.name.trim().is_empty() {
+            return Err(RegistryValidationError::MissingRequiredField(
+                "serviceProvider.name".into(),
+            ));
+        }
+        // 🚨 All or nothing, for the reason `OperatorIdentifier::validate`
+        // already gives: a value with no scheme does not say whether it is a VAT
+        // number, an LEI or a DID, so it identifies nobody while looking as
+        // though it does. A scheme with no value is the same defect mirrored.
+        match (self.scheme.as_deref(), self.value.as_deref()) {
+            (None, None) => {}
+            (Some(scheme), Some(value)) => {
+                if scheme.trim().is_empty() {
+                    return Err(RegistryValidationError::MissingRequiredField(
+                        "serviceProvider.scheme".into(),
+                    ));
+                }
+                // 🚨 And the value, before the per-scheme check rather than
+                // through it. `validate_operator_scheme` accepts `"did"` and
+                // every unrecognised scheme without looking at the value, so a
+                // blank one reached `Ok` — which made `Some("did")` with an
+                // empty value pass while `Some("did")` with no value at all is
+                // refused two arms down. The same absence, two answers.
+                if value.trim().is_empty() {
+                    return Err(RegistryValidationError::MissingRequiredField(
+                        "serviceProvider.value".into(),
+                    ));
+                }
+                validate_operator_scheme(scheme, value)?;
+            }
+            (Some(_), None) => {
+                return Err(RegistryValidationError::MissingRequiredField(
+                    "serviceProvider.value".into(),
+                ));
+            }
+            (None, Some(_)) => {
+                return Err(RegistryValidationError::MissingRequiredField(
+                    "serviceProvider.scheme".into(),
+                ));
+            }
+        }
+        if let Some(country) = &self.country {
+            validate_country_code(country)?;
+        }
+        Ok(())
+    }
+}
+
+// ── EN 18219 clause 5 → the registry's product identifier ────────────────────
+
+/// The registry `scheme` value for an EN 18219 **scheme 1** identifier.
+///
+/// `"gtin"` rather than `"gs1"`: the registry's `scheme` names *what the value
+/// is*, and its own examples are value kinds — `"gtin"`, `"gln"`, `"did"`.
+/// [`ProductIdentifier::validate`] already branches on this exact string to
+/// check the mod-10, so it is the one scheme value with behaviour attached.
+///
+/// The domain enum's own persisted tag is `"gs1"`, which names the *scheme*
+/// rather than the value. Two vocabularies, deliberately not collapsed: the
+/// clause 5 scheme and the kind of the value it carries are different questions
+/// and only coincide for schemes 2 and 3.
+pub const SCHEME_GTIN: &str = "gtin";
+
+/// The registry `scheme` value for an EN 18219 **scheme 2** identification link.
+///
+/// 🚨 The one of the three with no precedent anywhere. The registry names no
+/// value kind for an EN IEC 61406 URL, so this reuses the domain enum's own
+/// persisted tag — already shipped in eleven published schemas — rather than
+/// inventing a third spelling for a thing that now has two.
+pub const SCHEME_IDENTIFICATION_LINK: &str = "identificationLink";
+
+/// The registry `scheme` value for an EN 18219 **scheme 3** DID.
+///
+/// The one string both vocabularies already agree on: it appears in this
+/// crate's own scheme examples and is the domain enum's tag.
+pub const SCHEME_DID: &str = "did";
+
+/// Every product-identifier scheme value this crate emits, with what backs it.
+///
+/// 🚨 **All three are [`RegistryBasis::Assumed`], and the table exists to say so
+/// where code can read it** rather than in prose nobody can assert against. No
+/// published specification names any of them and none has been observed on the
+/// wire; `"gtin"` and `"did"` have in-crate precedent, which is a convention of
+/// ours and not evidence about the registry.
+///
+/// A slice rather than an array, so that mapping a new scheme does not change
+/// the constant's type for every caller that names it.
+pub const PRODUCT_SCHEME_BASIS: &[(&str, RegistryBasis)] = &[
+    (SCHEME_GTIN, RegistryBasis::Assumed),
+    (SCHEME_IDENTIFICATION_LINK, RegistryBasis::Assumed),
+    (SCHEME_DID, RegistryBasis::Assumed),
+];
+
+impl TryFrom<&dpp_domain::identifier::ProductIdentifier> for ProductIdentifier {
+    type Error = RegistryValidationError;
+
+    /// Carry an EN 18219 clause 5 identifier into the registry's shape.
+    ///
+    /// The conversion every consumer registering a passport had to write for
+    /// itself, and the `scheme` string is where an invented one goes wrong
+    /// **without failing**: [`ProductIdentifier::validate`] only checks
+    /// structure when the scheme is `"gtin"`, so a DID mislabelled `"gtn"`
+    /// passes validation and is submitted as though it identified something.
+    ///
+    /// # Why `TryFrom` and not `From`
+    ///
+    /// 🚨 `dpp_domain::identifier::ProductIdentifier` is `#[non_exhaustive]`, so
+    /// a match on it **cannot** be exhaustive from this crate — the compiler
+    /// requires a wildcard arm, and a wildcard that produced a scheme string
+    /// would label a clause 5 scheme nobody has mapped as though it had been.
+    /// A fallible conversion turns that into a refusal naming the value, which
+    /// is the loudest a downstream crate is able to be.
+    ///
+    /// The GS1 arm yields the bare 14-digit GTIN, not a Digital Link URL:
+    /// building the URL needs a resolver host, which is a deployment fact this
+    /// tier does not know.
+    fn try_from(
+        identifier: &dpp_domain::identifier::ProductIdentifier,
+    ) -> Result<Self, Self::Error> {
+        use dpp_domain::identifier::ProductIdentifier as Clause5;
+
+        let scheme = match identifier {
+            Clause5::Gs1 { .. } => SCHEME_GTIN,
+            Clause5::IdentificationLink { .. } => SCHEME_IDENTIFICATION_LINK,
+            Clause5::Did { .. } => SCHEME_DID,
+            unmapped => {
+                return Err(RegistryValidationError::UnmappedIdentifierScheme {
+                    identifier: unmapped.as_str().to_owned(),
+                });
+            }
+        };
+        Ok(Self {
+            scheme: scheme.to_owned(),
+            value: identifier.as_str().to_owned(),
+            label: None,
+        })
+    }
+}

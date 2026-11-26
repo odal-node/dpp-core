@@ -43,17 +43,17 @@ src/
 │
 ├── kernel/                   machinery shared by every methodology
 │   ├── error.rs              CalcError (InvalidInput | RulesetExpired | FactorNotFound | …)
-│   ├── receipt.rs            CalculationReceipt: proof-of-calculation envelope
+│   ├── receipt/              CalculationReceipt: proof-of-calculation envelope
 │   ├── ruleset.rs            RulesetId, RulesetVersion, Effectivity, RegulatoryBasis
 │   │                         ParameterBasis: are these numbers law, or ours?
 │   │                         Ruleset trait: every methodology trait extends this
 │   ├── parameters.rs         RulesetParameters + fill(): a signed bundle may fill
 │   │                         an Assumed ruleset's numbers, never a Sourced one's
-│   ├── clock.rs              AssessmentClock: the governing-law date; there is no now()
-│   ├── assessability.rs      Assessability<T>: Assessed | NotYetInForce | Undetermined
+│   ├── clock/                AssessmentClock: the governing-law date; there is no now()
+│   ├── assessability/        Assessability<T>: Assessed | NotYetInForce | Undetermined
 │   │                         | Expired | OutOfScope, none of which is non-compliance
 │   ├── factor.rs             FactorProvider trait
-│   ├── synthetic_factor.rs   SyntheticFactorProvider (test/CI only)
+│   ├── synthetic_factor/     SyntheticFactorProvider (test/CI only)
 │   └── hashing.rs            canonical input hashing behind input_hash
 │
 ├── ruleset_registry/         date-based ruleset resolution; all_rulesets() CI iterator
@@ -72,19 +72,19 @@ src/
 │   └── tests/vectors.rs      #[cfg(test)]
 │
 ├── repairability/            Simplified, non-regulatory six-parameter A to E heuristic
-│   ├── calculator.rs         calculate(inputs, ruleset, clock) → RepairabilityResult
+│   ├── calculator/           calculate(inputs, ruleset, clock) → RepairabilityResult
 │   ├── parameters.rs         RepairabilityInputs (6 × u8, ordinal 0 to 2)
 │   ├── thresholds/           RepairabilityRuleset trait + SimplifiedRepairabilityHeuristic,
 │   │                         LaptopRuleset, DisplaysRuleset, WashingMachineRuleset
 │   └── tests/vectors.rs      #[cfg(test)]: A to E coverage, regulatory-basis non-empty CI check
 │
 └── co2e/
-    ├── calculator.rs         calculate(inputs, ruleset, clock) → Co2eResult (cradle-to-gate,
+    ├── calculator/           calculate(inputs, ruleset, clock) → Co2eResult (cradle-to-gate,
     │                         operator-supplied emission factors)
     ├── parameters.rs         Co2eInputs, MaterialFootprint
     ├── thresholds.rs         Co2eRuleset trait + CradleToGateRuleset
-    ├── cfb.rs                CfbRuleset: Ruleset stub + calculate_cfb() STUB
-    ├── gwp_factors.rs        Embedded GWP100 characterisation factors (EF 3.1 / AR6, free)
+    ├── cfb/                  CfbRuleset: Ruleset stub + calculate_cfb() STUB
+    ├── gwp_factors/          Embedded GWP100 characterisation factors (EF 3.1 / AR6, free)
     └── tests/vectors.rs      #[cfg(test)]
 ```
 

@@ -1,5 +1,7 @@
 //! Tests of the `element_string` module.
 
+use super::super::super::error::DigitalLinkError;
+use super::super::super::link::DigitalLink;
 use super::super::*;
 
 /// A valid GTIN-14 used throughout; its check digit is correct.

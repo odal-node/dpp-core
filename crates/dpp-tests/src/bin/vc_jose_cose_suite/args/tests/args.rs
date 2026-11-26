@@ -1,6 +1,7 @@
 //! Tests of `args`.
 
 use super::super::*;
+use std::path::PathBuf;
 
 fn parse_all(args: &[&str]) -> Result<Args, String> {
     parse(args.iter().map(|a| (*a).to_owned()))

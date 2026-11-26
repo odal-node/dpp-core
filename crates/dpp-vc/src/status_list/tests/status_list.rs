@@ -1,6 +1,7 @@
 //! Tests of the `status_list` module.
 
 use super::super::*;
+use base64::Engine;
 use flate2::{Compression, write::GzEncoder};
 use std::io::Write;
 
