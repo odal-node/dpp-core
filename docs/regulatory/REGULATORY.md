@@ -27,7 +27,7 @@ placeholder module makes the directory structure explicit about what will be nee
 
 ## Batteries: Regulation (EU) 2023/1542
 
-### `batteries/chemistry.rs`: implemented
+### `batteries/chemistry/`: implemented
 
 | Rule | Threshold | Legal basis | Status |
 |---|---|---|---|
@@ -47,7 +47,7 @@ that JSON Schema cannot express across two fields.
 
 ---
 
-### `batteries/recycled_content.rs`: constants implemented, determination pending
+### `batteries/recycled_content/`: constants implemented, determination pending
 
 The Art. 8(2) and 8(3) recycled content targets are **settled law**: they are in the
 regulation text itself, not in a delegated act. Neither phase is in force yet. Art. 8(2) and
@@ -96,7 +96,7 @@ methodology delegated act (due 18 August 2026) is adopted.
 
 ---
 
-### `batteries/degradation.rs`: pending delegated act
+### `batteries/degradation/`: pending delegated act
 
 Two regimes on two timelines; only the second is pending.
 
@@ -187,7 +187,7 @@ validation rule. When the delegated act is published, implement the class bounda
 
 ## Textiles: the ESPR textile delegated act
 
-### `textiles/fibre.rs`: implemented
+### `textiles/fibre/`: implemented
 
 | Rule | Logic | Status |
 |---|---|---|
@@ -250,7 +250,7 @@ reason.
 
 ## Metals
 
-### `metals/aluminium.rs`: CBAM benchmarks implemented, no passport mandate
+### `metals/aluminium/`: CBAM benchmarks implemented, no passport mandate
 
 | Rule | Threshold (kg CO₂e per t) | Status |
 |---|---|---|
@@ -337,14 +337,14 @@ passport's data requirements are specified.
 
 | Module | Status | Unblocked by |
 |---|---|---|
-| `batteries/chemistry.rs` | Implemented | |
-| `batteries/recycled_content.rs` | Constants and functions ready | The determination switches in 2031, with no code change |
-| `batteries/degradation.rs` | Pending | Art. 10(5) delegated acts (due 18 Feb 2026 and 18 Feb 2027) |
+| `batteries/chemistry/` | Implemented | |
+| `batteries/recycled_content/` | Constants and functions ready | The determination switches in 2031, with no code change |
+| `batteries/degradation/` | Pending | Art. 10(5) delegated acts (due 18 Feb 2026 and 18 Feb 2027) |
 | Battery CO₂e class | Pending (belongs in `dpp-calc`) | Art. 7(2) delegated act |
-| `textiles/fibre.rs` | Implemented | |
+| `textiles/fibre/` | Implemented | |
 | `textiles/care.rs` | Schema change needed | A structured `careSymbols` field in the textile schema |
 | `electronics/spare_parts.rs` | Schema change needed | A period field in the electronics schema and an ESPR delegated act |
-| `metals/aluminium.rs` | Benchmarks only | A passport threshold in an ESPR delegated act (indicative adoption 2027) |
+| `metals/aluminium/` | Benchmarks only | A passport threshold in an ESPR delegated act (indicative adoption 2027) |
 | `metals/steel.rs` | Pending | An ESPR delegated act (timeline unknown) |
 | `construction/mod.rs` | Not mandated yet | A CPR 2024/3110 Art. 75(1) delegated act (none adopted; undated) |
 | `toys/mod.rs` | Not mandated yet | The toy passport data requirements (passport from 1 August 2030) |

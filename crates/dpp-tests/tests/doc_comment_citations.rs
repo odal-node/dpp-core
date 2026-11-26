@@ -87,7 +87,7 @@ const UNPINNED_LEGACY: &[&str] = &[
     "dpp-domain/src/unsold_goods/financial_year.rs",
     "dpp-domain/src/unsold_goods/reason.rs",
     "dpp-rules/src/batteries/passport_scope.rs",
-    "dpp-rules/src/metals/aluminium.rs",
+    "dpp-rules/src/metals/aluminium/mod.rs",
     "dpp-rules/src/metals/steel.rs",
 ];
 
@@ -128,6 +128,32 @@ fn source_files(dir: &Path, out: &mut Vec<PathBuf>) {
             out.push(path);
         }
     }
+}
+
+/// Whether the file records where its figures were read.
+///
+/// A `mod.rs` holds its module's docs and the parts hold the constants those docs
+/// introduce, so the pin sits in a part: for a `mod.rs` a pin in any file beside
+/// it counts, the same latitude the doc above gives a pin within one file.
+fn pinned(path: &Path, src: &str) -> bool {
+    if src.contains(PIN) {
+        return true;
+    }
+    if path.file_name().and_then(|n| n.to_str()) != Some("mod.rs") {
+        return false;
+    }
+    let Some(dir) = path.parent() else {
+        return false;
+    };
+    fs::read_dir(dir)
+        .into_iter()
+        .flatten()
+        .flatten()
+        .any(|entry| {
+            let sibling = entry.path();
+            sibling.extension().and_then(|e| e.to_str()) == Some("rs")
+                && fs::read_to_string(&sibling).is_ok_and(|text| text.contains(PIN))
+        })
 }
 
 /// One run of consecutive doc-comment lines, with the line it starts on.
@@ -266,7 +292,7 @@ fn a_quantity_attributed_to_an_act_names_its_source() {
             // constant it governs, tens of lines below. Requiring them in one
             // comment would fail on correct files, and a gate that fails on
             // correct files gets deleted rather than obeyed.
-            if src.contains(PIN) {
+            if pinned(&file, &src) {
                 continue;
             }
             let relative = repo_relative(&file);
@@ -314,7 +340,7 @@ fn the_unpinned_inventory_does_not_go_stale() {
             missing.push(entry);
             continue;
         };
-        if src.contains(PIN) {
+        if pinned(&path, &src) {
             fixed.push(entry);
             continue;
         }

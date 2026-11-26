@@ -8,7 +8,7 @@ use serde_json::{Value, json};
 use dpp_crypto::jws::KeyAlgorithm;
 use dpp_crypto::sd_jwt::{KeyBinding, KeyBindingPolicy, SdJwt};
 
-use super::Issued;
+use super::corpus::Issued;
 use crate::test_support::{KID, credential, generated, presentation};
 
 /// The challenge a bound case answers: the Verifier, the nonce it issued, the instant it

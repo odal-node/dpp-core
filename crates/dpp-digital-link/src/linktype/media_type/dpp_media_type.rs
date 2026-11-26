@@ -1,0 +1,48 @@
+//! The media types a passport can be served as.
+
+use serde::{Deserialize, Serialize};
+
+/// Media types relevant to DPP content negotiation.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum DppMediaType {
+    /// `application/json` — raw DPP JSON data.
+    Json,
+    /// `application/ld+json` — JSON-LD representation with context.
+    JsonLd,
+    /// `text/html` — human-readable product information page.
+    Html,
+    /// `application/pdf` — PDF version of the DPP.
+    Pdf,
+    /// `application/cbor` — compact binary representation.
+    Cbor,
+    /// Custom media type.
+    Custom(String),
+}
+
+impl DppMediaType {
+    /// Parse from a MIME type string.
+    pub fn parse(s: &str) -> Self {
+        // Strip parameters (e.g., "; charset=utf-8")
+        let base = s.split(';').next().unwrap_or(s).trim();
+        match base {
+            "application/json" => Self::Json,
+            "application/ld+json" => Self::JsonLd,
+            "text/html" => Self::Html,
+            "application/pdf" => Self::Pdf,
+            "application/cbor" => Self::Cbor,
+            other => Self::Custom(other.to_owned()),
+        }
+    }
+
+    /// Return the MIME type string.
+    pub fn as_mime(&self) -> &str {
+        match self {
+            Self::Json => "application/json",
+            Self::JsonLd => "application/ld+json",
+            Self::Html => "text/html",
+            Self::Pdf => "application/pdf",
+            Self::Cbor => "application/cbor",
+            Self::Custom(s) => s.as_str(),
+        }
+    }
+}

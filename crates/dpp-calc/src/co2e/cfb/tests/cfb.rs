@@ -1,6 +1,7 @@
 //! Tests of the `cfb` module.
 
 use super::super::*;
+use crate::error::CalcError;
 use crate::factor::SyntheticFactorProvider;
 
 #[test]

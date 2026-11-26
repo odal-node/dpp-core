@@ -1,6 +1,7 @@
 //! Tests of the `granularity` module.
 
 use super::super::*;
+use crate::error::RegistryValidationError;
 
 #[test]
 fn granularity_round_trips_through_its_wire_form() {

@@ -34,7 +34,7 @@
     },
     {
       "path": "docs/architecture/CODE-LAYOUT.md",
-      "description": "Where a file goes and the numbered layout rules the tripwires enforce: tests in sibling files, errors in error.rs, file size limits.",
+      "description": "Where a file goes and the numbered layout rules the tripwires enforce: tests only in tests/ directories, no module file beside its own directory, errors in error.rs, file size limits.",
       "scope": ["crates/**", "plugins/**"]
     },
     {

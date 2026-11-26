@@ -1,6 +1,7 @@
 //! Tests of the `chemistry` module.
 
 use super::super::*;
+use crate::common::date::CalendarDate;
 
 #[test]
 fn mercury_at_and_below_threshold_allowed() {

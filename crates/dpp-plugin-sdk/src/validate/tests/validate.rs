@@ -1,6 +1,7 @@
 //! Tests of the `validate` module.
 
 use super::super::*;
+use dpp_plugin_traits::PluginError;
 use serde_json::json;
 
 #[test]

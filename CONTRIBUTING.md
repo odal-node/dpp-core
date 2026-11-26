@@ -113,7 +113,7 @@ Anything that must agree with the domain about whether an identifier is well for
 depends on it directly instead of restating the table. Because `dpp-rules` is `no_std`
 with no dependencies, that edge costs nothing.
 
-`dpp-tests` keeps three edges as normal dependencies because `src/fixtures.rs` is a
+`dpp-tests` keeps three edges as normal dependencies because `src/fixtures/` is a
 library used by the integration tests. The crate is `publish = false`, so none of these
 edges reach a published graph.
 

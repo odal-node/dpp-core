@@ -1,5 +1,7 @@
 //! Tests of the `receipt` module.
 
+use super::super::super::clock::AssessmentClock;
+use super::super::super::error::CalcError;
 use super::super::*;
 use chrono::NaiveDate;
 

@@ -34,7 +34,7 @@ path = "src/lib.rs"
 name = "vc-jose-cose-suite"
 path = "src/bin/vc_jose_cose_suite/main.rs"
 
-# The library hosts shared test fixtures (see `src/fixtures.rs`) consumed by
+# The library hosts shared test fixtures (see `src/fixtures/`) consumed by
 # the integration tests below, so its own core-crate dependencies are real
 # (not dev-only) dependencies.
 [dependencies]

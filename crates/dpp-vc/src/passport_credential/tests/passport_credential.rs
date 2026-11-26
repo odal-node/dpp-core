@@ -1,6 +1,7 @@
 //! Tests of the `passport_credential` module.
 
 use super::super::*;
+use dpp_domain::PassportId;
 
 #[test]
 fn subject_id_is_the_passport_uuid_urn() {

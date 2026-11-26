@@ -151,10 +151,13 @@ them is a separate piece of work, not something this rule asks for.
 State machines like `PassportStatus` count. A small closed enum that exists only as one
 parent's field may stay in the parent's file.
 
-### Rule 6: only `lib.rs` at the `src/` root
+### Rule 6: only `lib.rs`, `main.rs` and `test_support.rs` at the `src/` root
 
-Everything else lives in a directory module. The permitted exceptions are `main.rs`, for a
-binary target, and `test_support.rs` (rule 9).
+A crate's `src/` root holds `lib.rs` (or `main.rs`, for a binary target) and
+`test_support.rs` (rule 9), and nothing else. Every other module is a directory, with a
+`mod.rs` that is a pure index (rule 2) and a file for each thing it holds (rule 1). There
+is no baseline and no exception: a `src/endpoint.rs` is `src/endpoint/mod.rs` plus
+`src/endpoint/routes.rs`, and `crate::endpoint::…` reads the same either way.
 
 ### Rule 7: a test lives in a directory named `tests`, and nowhere else
 
@@ -265,6 +268,15 @@ its subject needs; the fixed names exist so that the *rest* of the listing is th
 *beside* them is `check_digit.rs`: `Gtin` and `Gln` both use it, so rule 15 puts it at
 their nearest common parent, not in either.
 
+**A module that has a directory keeps all of itself inside it.** `foo.rs` never sits
+beside `foo/`, at any depth under any `src/`, the `tests/` trees and the binaries'
+directories included. When a leaf module gains a `foo/tests/`, it becomes a directory
+like any other: `foo/mod.rs` is the index, and what the file held moves to a part named
+for it (`foo/key.rs`, never `foo/foo.rs`, which rule 12 forbids). A `foo.rs` beside
+`foo/` reads as two concepts that happen to share a name, and a reader has to open both
+to learn that they are one. Moving the file changes no path: the part is a private
+module and `mod.rs` re-exports what was public, so `crate::foo::Item` stays where it was.
+
 The shape makes a module skimmable without opening it. Every directory draws on the same
 three fixed names, `mod.rs`, `error.rs` and `tests/`, so anything else in the listing is
 a `<part>.rs`, and the parts are the subject.
@@ -352,7 +364,7 @@ A rule with no escape hatch is deleted the first time it is inconvenient. A rule
 ## 4. What enforces what
 
 Every enforced rule except rule 2 lives in `crates/dpp-tests/tests/layout.rs`, one
-`#[test]` each (rule 7 has two), sharing one directory walk. Rule 2 has its own file because it predates
+`#[test]` each (rules 7 and 11 have two), sharing one directory walk. Rule 2 has its own file because it predates
 the rest.
 
 | Rule | Test | Fails when |
@@ -361,7 +373,7 @@ the rest.
 | 2 | `mod_rs_is_pure_index` | a `mod.rs` declares a public item |
 | 3 | none | *guidance only* |
 | 4 | `layout::rule_4_tests_files_are_navigable` | a file in a `tests/` directory under `src/` exceeds 500 lines (400 target plus 100 tolerance) |
-| 6, 9 | `layout::rule_6_only_lib_rs_at_src_root` | a crate has a root `.rs` other than `lib.rs`, `main.rs` or `test_support.rs` |
+| 6, 9 | `layout::rule_6_only_lib_rs_at_src_root` | a crate has a `.rs` in its `src/` root other than `lib.rs`, `main.rs` or `test_support.rs` |
 | 7 | `layout::rule_7_tests_live_in_a_tests_directory` | a file under `src/` outside a `tests/` directory holds a `#[test]`, `#[tokio::test]` or `proptest!`, an inline `mod tests {` or `mod <name>_tests {`, or a `mod <name>_tests;` declaration |
 | 7 | `layout::rule_7_no_test_word_inside_tests` | a file or directory inside any `tests/` directory, crate-level ones included, has `test` or `tests` as a word in its name (`fixtures/` excepted) |
 | 8 | `layout::rule_8_every_file_has_module_docs` | a `.rs` file has no `//!` in its first three lines |
@@ -369,6 +381,7 @@ the rest.
 | 0 | `layout::rule_0_tier_imports_point_up` | a module imports a higher tier, or is missing from the tier table |
 | 0 | `layout::rule_0_module_graph_is_acyclic` | two modules import each other, directly or through a chain |
 | 11 | `layout::rule_11_an_outgrown_concept_is_a_directory` | two files in one directory share a stem prefix (`gtin.rs` beside `gtin_check_digit.rs`) |
+| 11 | `layout::rule_11_a_module_with_a_directory_is_a_directory` | a `foo.rs` sits beside a `foo/` directory, anywhere under a `src/` |
 | 12 | `layout::rule_12_no_name_repeats_its_directory` | a filename begins with its parent directory's name |
 | 13 | `layout::rule_13_hyphens_outside_module_paths` | a `-` appears under `src/`, or a `_` in a crate or data directory |
 | 14 | `layout::rule_14_errors_live_in_error_rs` | a `pub enum …Error` is declared outside an `error.rs` |
@@ -381,7 +394,7 @@ these tests exist to prevent.
 Two of these checks are **proxies**, like rule 1's, and the document says so rather than
 implying the test is the rule:
 
-- **Rule 11.** A test cannot tell whether two files are one concept. It can tell that
+- **Rule 11, the stem-prefix check.** A test cannot tell whether two files are one concept. It can tell that
   `gtin.rs` sits beside `gtin_check_digit.rs`, which is what an outgrown concept looks
   like from outside.
 - **Rule 15.** "Shared" is a claim about intent, so the check reads a roster of bucket

@@ -1,0 +1,213 @@
+//! GTIN normalisation, percent-coding and URI component checks.
+
+use super::super::error::DigitalLinkError;
+
+/// Left-pad a GTIN string to 14 digits (GTIN-8, -12, -13 → GTIN-14).
+pub(crate) fn normalize_gtin_to_14(s: &str) -> Result<String, DigitalLinkError> {
+    if !s.bytes().all(|b| b.is_ascii_digit()) {
+        return Err(DigitalLinkError::InvalidGtin(s.to_owned()));
+    }
+    match s.len() {
+        8 | 12 | 13 => Ok(format!("{:0>14}", s)),
+        14 => Ok(s.to_owned()),
+        _ => Err(DigitalLinkError::InvalidGtin(s.to_owned())),
+    }
+}
+
+/// Decode the percent escapes in a URI path segment value.
+///
+/// A `%` must be followed by two hexadecimal digits, and the decoded bytes must
+/// be UTF-8. Anything else is an error rather than being passed through, since a
+/// value read as something other than what the URI spelled is a different
+/// identifier from the one printed on the label.
+pub(crate) fn percent_decode(s: &str) -> Result<String, DigitalLinkError> {
+    let malformed = || DigitalLinkError::MalformedPercentEscape(s.to_owned());
+    let bytes = s.as_bytes();
+    let mut result: Vec<u8> = Vec::with_capacity(bytes.len());
+    let mut i = 0;
+    while i < bytes.len() {
+        if bytes[i] != b'%' {
+            result.push(bytes[i]);
+            i += 1;
+            continue;
+        }
+        let hex = bytes.get(i + 1..i + 3).ok_or_else(malformed)?;
+        let hex = std::str::from_utf8(hex).map_err(|_| malformed())?;
+        // `from_str_radix` accepts a leading `+`, which an escape does not.
+        if !hex.bytes().all(|b| b.is_ascii_hexdigit()) {
+            return Err(malformed());
+        }
+        result.push(u8::from_str_radix(hex, 16).map_err(|_| malformed())?);
+        i += 3;
+    }
+    String::from_utf8(result).map_err(|_| malformed())
+}
+
+/// Percent-encode a string for use as a GS1 DL URI path segment value.
+///
+/// Everything outside RFC 3986's unreserved set is encoded as `%XX`. That is
+/// narrower than a path segment allows, on purpose: GS1's grammar spells every
+/// symbol of the 82-character set that is not `-`, `.` or `_` as its escape, so
+/// a value leaves here in the one form the grammar names. `!`, `&`, `'`, `(`,
+/// `)`, `*`, `+`, `,`, `;`, `=` and `:` are legal in a path under RFC 3986, and
+/// the parser still accepts them raw, but they are not what the grammar says.
+pub(crate) fn percent_encode(s: &str) -> String {
+    let mut result = String::with_capacity(s.len());
+    for &byte in s.as_bytes() {
+        match byte {
+            // Unreserved (RFC 3986 §2.3)
+            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'.' | b'_' | b'~' => {
+                result.push(byte as char);
+            }
+            _ => {
+                result.push('%');
+                result.push_str(&format!("{byte:02X}"));
+            }
+        }
+    }
+    result
+}
+
+/// Whether `authority` is a host, and an optional port, a Web URI can have.
+///
+/// The host is a registered name, an IPv4 address, or a bracketed IPv6 address
+/// or IPvFuture literal, and the port is digits: RFC 3986 section 3.2.2, which
+/// GS1's grammar restates. A user name and an `@` are not part of it.
+pub(crate) fn is_valid_authority(authority: &str) -> bool {
+    let (host, port) = if let Some(literal) = authority.strip_prefix('[') {
+        let Some((inside, rest)) = literal.split_once(']') else {
+            return false;
+        };
+        if !is_ip_literal(inside) {
+            return false;
+        }
+        (
+            None,
+            rest.strip_prefix(':').or(rest.is_empty().then_some("")),
+        )
+    } else {
+        match authority.split_once(':') {
+            Some((host, port)) => (Some(host), Some(port)),
+            None => (Some(authority), Some("")),
+        }
+    };
+    let port_ok = port.is_some_and(|p| p.bytes().all(|b| b.is_ascii_digit()));
+    // A grammar `reg-name` may be empty, but a base with no host names no
+    // resolver, and one cannot be written back out: `build` trims the slashes
+    // that would then follow the scheme.
+    let host_ok = host.is_none_or(|h| !h.is_empty() && is_reg_name(h));
+    port_ok && host_ok
+}
+
+/// Whether `segment` is a path segment: RFC 3986's `*pchar`, which GS1's grammar
+/// restates, where `pchar = unreserved / pct-encoded / sub-delims / ":" / "@"`.
+///
+/// `also` admits characters the grammar allows beyond that in one position: the
+/// value of an AI may hold the double quote, which `XSYMBOL` names as itself.
+/// Everything else outside `pchar` (a space, `<`, `>`, `#`, `[`, a character
+/// beyond ASCII) is not a character a path segment can hold raw.
+pub(crate) fn is_segment(segment: &str, also: &[u8]) -> bool {
+    let bytes = segment.as_bytes();
+    let mut i = 0;
+    while i < bytes.len() {
+        match bytes[i] {
+            b'%' if bytes.get(i + 1).is_some_and(u8::is_ascii_hexdigit)
+                && bytes.get(i + 2).is_some_and(u8::is_ascii_hexdigit) =>
+            {
+                i += 3;
+            }
+            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'.' | b'_' | b'~' => i += 1,
+            b'!' | b'$' | b'&' | b'\'' | b'(' | b')' | b'*' | b'+' | b',' | b';' | b'=' => i += 1,
+            b':' | b'@' => i += 1,
+            b if also.contains(&b) => i += 1,
+            _ => return false,
+        }
+    }
+    true
+}
+
+/// `reg-name = *( unreserved / pct-encoded / sub-delims )`.
+fn is_reg_name(host: &str) -> bool {
+    let bytes = host.as_bytes();
+    let mut i = 0;
+    while i < bytes.len() {
+        match bytes[i] {
+            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'.' | b'_' | b'~' => i += 1,
+            b'!' | b'$' | b'&' | b'\'' | b'(' | b')' | b'*' | b'+' | b',' | b';' | b'=' => i += 1,
+            b'%' if bytes.get(i + 1).is_some_and(u8::is_ascii_hexdigit)
+                && bytes.get(i + 2).is_some_and(u8::is_ascii_hexdigit) =>
+            {
+                i += 3;
+            }
+            _ => return false,
+        }
+    }
+    true
+}
+
+/// The inside of `[` and `]`: an IPv6 address or an IPvFuture literal.
+fn is_ip_literal(inside: &str) -> bool {
+    if let Some(rest) = inside.strip_prefix(['v', 'V']) {
+        let Some((version, tail)) = rest.split_once('.') else {
+            return false;
+        };
+        return !version.is_empty()
+            && version.bytes().all(|b| b.is_ascii_hexdigit())
+            && !tail.is_empty()
+            && tail
+                .bytes()
+                .all(|b| b.is_ascii_alphanumeric() || b"-._~!$&'()*+,;=:".contains(&b));
+    }
+    is_ipv6(inside)
+}
+
+/// RFC 3986's `IPv6address`: eight 16-bit groups, one run of which may be
+/// written `::`, and the last two of which may be an IPv4 address.
+fn is_ipv6(address: &str) -> bool {
+    let groups_of = |part: &str| -> Option<usize> {
+        if part.is_empty() {
+            return Some(0);
+        }
+        let pieces: Vec<&str> = part.split(':').collect();
+        let mut count = 0;
+        for (index, piece) in pieces.iter().enumerate() {
+            if index + 1 == pieces.len() && piece.contains('.') {
+                if !is_ipv4(piece) {
+                    return None;
+                }
+                count += 2;
+            } else if (1..=4).contains(&piece.len()) && piece.bytes().all(|b| b.is_ascii_hexdigit())
+            {
+                count += 1;
+            } else {
+                return None;
+            }
+        }
+        Some(count)
+    };
+    match address.split_once("::") {
+        None => groups_of(address) == Some(8),
+        Some((head, tail)) => {
+            if tail.contains("::") {
+                return false;
+            }
+            match (groups_of(head), groups_of(tail)) {
+                (Some(h), Some(t)) => h + t <= 7,
+                _ => false,
+            }
+        }
+    }
+}
+
+/// Four decimal octets, each 0 to 255 with no leading zero.
+fn is_ipv4(address: &str) -> bool {
+    let octets: Vec<&str> = address.split('.').collect();
+    octets.len() == 4
+        && octets.iter().all(|o| {
+            !o.is_empty()
+                && o.len() <= 3
+                && o.bytes().all(|b| b.is_ascii_digit())
+                && (o.len() == 1 || !o.starts_with('0'))
+                && o.parse::<u16>().is_ok_and(|n| n <= 255)
+        })
+}

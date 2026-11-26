@@ -1,5 +1,7 @@
 //! Tests of the `synthetic_factor` module.
 
+use super::super::super::error::CalcError;
+use super::super::super::factor::FactorProvider;
 use super::super::*;
 
 #[test]

@@ -1,8 +1,11 @@
 //! Tests of the `calculator` module.
 
+use super::super::super::parameters::Co2eInputs;
 use super::super::*;
+use crate::clock::AssessmentClock;
 use crate::co2e::parameters::MaterialFootprint;
 use crate::co2e::thresholds::CradleToGateRuleset;
+use crate::error::CalcError;
 use chrono::NaiveDate;
 
 /// A clock whose governing-law date sits inside CradleToGateRuleset's

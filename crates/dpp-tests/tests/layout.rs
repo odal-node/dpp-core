@@ -211,25 +211,25 @@ fn code_lines(src: &str) -> Vec<&str> {
 
 /// Files that already declared three or more public types when this landed.
 const ONE_TYPE_PER_FILE_BASELINE: &[&str] = &[
-    "crates/dpp-aas/src/model.rs",
-    "crates/dpp-calc/src/co2e/calculator.rs",
-    "crates/dpp-calc/src/co2e/cfb.rs",
+    "crates/dpp-aas/src/model/metamodel.rs",
+    "crates/dpp-calc/src/co2e/calculator/calculation.rs",
+    "crates/dpp-calc/src/co2e/cfb/calculation.rs",
     "crates/dpp-calc/src/kernel/ruleset.rs",
     "crates/dpp-calc/src/recycled_content/thresholds.rs",
-    "crates/dpp-calc/src/repairability/calculator.rs",
+    "crates/dpp-calc/src/repairability/calculator/calculation.rs",
     "crates/dpp-calc/src/repairability_index/thresholds.rs",
     "crates/dpp-calc/src/ruleset_registry/status.rs",
     "crates/dpp-crypto/src/jades/header.rs",
     "crates/dpp-crypto/src/keystore/store.rs",
-    "crates/dpp-plugin-traits/src/meta.rs",
-    "crates/dpp-plugin-traits/src/result.rs",
-    "crates/dpp-plugin-traits/src/version.rs",
-    "crates/dpp-registry/src/error.rs",
-    "crates/dpp-registry/src/identifiers.rs",
-    "crates/dpp-registry/src/response.rs",
-    "crates/dpp-rules/src/batteries/recycled_content.rs",
+    "crates/dpp-plugin-traits/src/meta/plugin_meta.rs",
+    "crates/dpp-plugin-traits/src/result/plugin_result.rs",
+    "crates/dpp-plugin-traits/src/version/abi_version.rs",
+    "crates/dpp-registry/src/error/registry_error.rs",
+    "crates/dpp-registry/src/identifiers/registry_identifier.rs",
+    "crates/dpp-registry/src/response/eu_registry_response.rs",
+    "crates/dpp-rules/src/batteries/recycled_content/thresholds.rs",
     "crates/dpp-rules/src/bundle/types.rs",
-    "crates/dpp-rules/src/chemicals/svhc.rs",
+    "crates/dpp-rules/src/chemicals/svhc/candidate_list.rs",
     "crates/dpp-vc/src/credential/trust.rs",
     "crates/dpp-vc/src/credential/types.rs",
 ];
@@ -320,36 +320,8 @@ fn rule_4_tests_files_are_navigable() {
 // Rule 6 + 9 — only lib.rs at src root, plus test_support.rs
 // ---------------------------------------------------------------------------
 
-const ROOT_FILES_BASELINE: &[&str] = &[
-    "crates/dpp-aas/src/builder.rs",
-    "crates/dpp-aas/src/mapper.rs",
-    "crates/dpp-aas/src/model.rs",
-    "crates/dpp-aas/src/property.rs",
-    "crates/dpp-aas/src/templates.rs",
-    "crates/dpp-plugin-sdk/src/abi.rs",
-    "crates/dpp-plugin-sdk/src/codec.rs",
-    "crates/dpp-plugin-sdk/src/entry.rs",
-    "crates/dpp-plugin-sdk/src/validate.rs",
-    "crates/dpp-plugin-traits/src/error.rs",
-    "crates/dpp-plugin-traits/src/meta.rs",
-    "crates/dpp-plugin-traits/src/plugin.rs",
-    "crates/dpp-plugin-traits/src/result.rs",
-    "crates/dpp-plugin-traits/src/version.rs",
-    "crates/dpp-registry/src/endpoint.rs",
-    "crates/dpp-registry/src/error.rs",
-    "crates/dpp-registry/src/granularity.rs",
-    "crates/dpp-registry/src/identifiers.rs",
-    "crates/dpp-registry/src/payload.rs",
-    "crates/dpp-registry/src/response.rs",
-    "crates/dpp-registry/src/transfer.rs",
-    // Rule 9 names this `test_support.rs`; renaming it is a later phase.
-    "crates/dpp-tests/src/fixtures.rs",
-    "crates/dpp-vc/src/did_builder.rs",
-    "crates/dpp-vc/src/local_service.rs",
-    "crates/dpp-vc/src/passport_credential.rs",
-    "crates/dpp-vc/src/status_list.rs",
-    "plugins/product-group-textile/src/fibre_composition.rs",
-];
+// Empty. Every module that sat loose in a crate's `src/` root became a directory.
+const ROOT_FILES_BASELINE: &[&str] = &[];
 
 #[test]
 fn rule_6_only_lib_rs_at_src_root() {
@@ -562,14 +534,10 @@ fn rule_7_no_test_word_inside_tests() {
 // ---------------------------------------------------------------------------
 
 const MODULE_DOCS_BASELINE: &[&str] = &[
-    "crates/dpp-aas/src/mapper.rs",
-    "crates/dpp-aas/src/model.rs",
     "crates/dpp-aas/src/product_groups/battery.rs",
     "crates/dpp-aas/src/product_groups/electronics.rs",
     "crates/dpp-aas/src/product_groups/textile.rs",
-    "crates/dpp-aas/src/property.rs",
     "crates/dpp-aas/src/semantic_ids/mod.rs",
-    "crates/dpp-aas/src/templates.rs",
     "crates/dpp-crypto/src/keystore/migration.rs",
     "crates/dpp-crypto/src/keystore/rotation.rs",
     "crates/dpp-rules/src/canonical/hash.rs",
@@ -828,6 +796,52 @@ fn rule_11_an_outgrown_concept_is_a_directory() {
 // module, which is exactly what this rule was asking for.
 const OUTGROWN_CONCEPT_BASELINE: &[&str] = &[];
 
+/// The second clause of rule 11: a module that has a directory keeps all of itself
+/// inside it. A `foo.rs` beside a `foo/` reads as two concepts that share a name.
+/// Not a proxy: the two names are the whole condition.
+#[test]
+fn rule_11_a_module_with_a_directory_is_a_directory() {
+    let mut found: BTreeMap<String, String> = BTreeMap::new();
+    for dir in governed_src_dirs() {
+        let mut dirs = vec![dir];
+        while let Some(d) = dirs.pop() {
+            let Ok(entries) = fs::read_dir(&d) else {
+                continue;
+            };
+            for entry in entries.flatten() {
+                let path = entry.path();
+                if path.is_dir() {
+                    dirs.push(path);
+                    continue;
+                }
+                if path.extension().and_then(|e| e.to_str()) != Some("rs") {
+                    continue;
+                }
+                let beside = path.with_extension("");
+                if !beside.is_dir() {
+                    continue;
+                }
+                let Some(src) = read_source(&path) else {
+                    continue;
+                };
+                if has_deviation_marker(&src) {
+                    continue;
+                }
+                found.insert(rel(&path), "its directory sits beside it".to_owned());
+            }
+        }
+    }
+    assert_against_baseline(
+        "CODE-LAYOUT.md rule 11 — a module with a directory is a directory: `foo.rs` never sits beside `foo/`",
+        &found,
+        MODULE_BESIDE_DIRECTORY_BASELINE,
+    );
+}
+
+// Empty. Every `foo.rs` that sat beside a `foo/` moved into it, as `foo/mod.rs` and
+// the parts it held.
+const MODULE_BESIDE_DIRECTORY_BASELINE: &[&str] = &[];
+
 // ---------------------------------------------------------------------------
 // Rule 12 — a file never repeats the name of its directory
 // ---------------------------------------------------------------------------
@@ -1010,7 +1024,7 @@ fn rule_14_errors_live_in_error_rs() {
 }
 
 const ERROR_PLACEMENT_BASELINE: &[&str] = &[
-    "crates/dpp-aas/src/builder.rs",
+    "crates/dpp-aas/src/builder/environment.rs",
     "crates/dpp-crypto/src/jades/header.rs",
     "crates/dpp-domain/src/schemas/lens/transform.rs",
     "crates/dpp-domain/src/schemas/lens/upcast_error.rs",
@@ -1124,7 +1138,7 @@ fn rule_15_shared_means_shared() {
     );
 }
 
-const SHARED_BUCKET_BASELINE: &[&str] = &["crates/dpp-rules/src/common/date.rs"];
+const SHARED_BUCKET_BASELINE: &[&str] = &["crates/dpp-rules/src/common/date/calendar_date.rs"];
 
 /// Every production import edge between two top-level `dpp-domain` modules.
 ///

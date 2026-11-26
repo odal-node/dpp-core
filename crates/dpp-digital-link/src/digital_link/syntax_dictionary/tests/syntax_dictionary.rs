@@ -1,6 +1,8 @@
 //! Tests of the `syntax_dictionary` module.
 
+use super::super::super::component::{CharKind, Component};
 use super::super::*;
+use std::collections::HashMap;
 
 /// Every non-comment line must yield at least one AI. A line the parser
 /// skips is an AI we would silently fail to recognise, so a dictionary
