@@ -15,7 +15,7 @@ fn sample_subject() -> DppCredentialSubject {
     }
 }
 
-fn sample_credential() -> DppAccessCredential {
+pub(super) fn sample_credential() -> DppAccessCredential {
     CredentialBuilder::new("did:web:authority.example.com".into(), sample_subject())
         .expires_in_days(365)
         .build()
@@ -76,7 +76,7 @@ fn verify_future_issuance_rejected() {
     let mut cred = sample_credential();
     cred.valid_from = Utc::now() + Duration::hours(1);
     let result = verify_credential_claims(&cred, None, Utc::now());
-    assert!(matches!(result, VerificationResult::MalformedCredential(_)));
+    assert!(matches!(result, VerificationResult::NotYetValid { .. }));
 }
 
 #[test]
@@ -142,7 +142,7 @@ fn vc2_uses_valid_from_until_not_issuance_expiration() {
 
 // ── Revocation ─────────────────────────────────────────────
 
-fn credential_with_status_index(index: &str) -> DppAccessCredential {
+pub(super) fn credential_with_status_index(index: &str) -> DppAccessCredential {
     CredentialBuilder::new("did:web:authority.example.com".into(), sample_subject())
         .with_status(CredentialStatus {
             id: format!("https://authority.example.com/status/1#{index}"),
@@ -181,7 +181,7 @@ fn fail_closed_when_status_list_unavailable() {
     let cred = credential_with_status_index("5");
     assert_eq!(
         verify_credential_with_revocation(&cred, None, Utc::now(), None),
-        VerificationResult::Revoked
+        VerificationResult::RevocationIndeterminate
     );
 }
 
@@ -201,7 +201,7 @@ fn indeterminate_index_fails_closed() {
     );
     assert_eq!(
         verify_credential_with_revocation(&cred, None, Utc::now(), Some(&list)),
-        VerificationResult::Revoked
+        VerificationResult::RevocationIndeterminate
     );
 }
 
@@ -435,12 +435,12 @@ fn revocation_and_trust_passes_when_no_status_present() {
 
 #[test]
 fn revocation_and_trust_fails_closed_without_status_list() {
-    // Has a credentialStatus but no list supplied → fail closed (Revoked).
+    // Has a credentialStatus but no list supplied → fail closed (RevocationIndeterminate).
     let cred = credential_with_status_index("5");
     let trusted = StaticTrustedIssuers::single(cred.issuer.clone());
     let result =
         verify_credential_with_revocation_and_trust(&cred, None, None, Utc::now(), None, &trusted);
-    assert_eq!(result, VerificationResult::Revoked);
+    assert_eq!(result, VerificationResult::RevocationIndeterminate);
 }
 
 #[test]
