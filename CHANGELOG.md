@@ -201,6 +201,19 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   older than this one takes no lock, so it can still open the file beside a newer build and
   save over it: never run one against a file a newer build has open. (#624)
 
+- **`VerificationResult` gains `RevocationIndeterminate` and `NotYetValid`.** A credential
+  that declares a revocation status the check cannot answer is `RevocationIndeterminate`,
+  where it was `Revoked`: no status list was supplied, or the list cannot answer for its
+  entry, because the entry's `statusPurpose` is not `revocation`, or its index is missing,
+  not a number, or out of range. `Revoked` now means only that the status bit is set. A
+  credential whose `validFrom` is later than the time it is checked at is
+  `NotYetValid { valid_from }`, where it was `MalformedCredential`. Neither variant is
+  valid, so `is_valid()` is false and a caller refuses both as it refuses `Revoked` and
+  `Expired`; the fail-closed policy is unchanged. **Migration:** a `match` on
+  `VerificationResult` needs an arm for each new variant. A caller that tested for `Revoked` to catch an
+  unavailable status list also tests for `RevocationIndeterminate`, and a caller that
+  matched `MalformedCredential` for a future `validFrom` matches `NotYetValid` instead.
+
 ### Added
 
 - **`TransferChain::from_value`: a stored chain read with its refusal as a value.** It applies
