@@ -611,7 +611,7 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   Before, both were written, so the header referenced one certificate and carried another.
   `is_eu_recognised_profile` still answers only whether the format is present. Migration:
   none for a reference built by `chain_of_der`, which takes the digest from the chain; a
-  reference built by hand must carry the digest of its first certificate.
+  reference built by hand must carry the digest of its first certificate. (#700)
 
 ## [0.24.0] - 2026-11-16
 
