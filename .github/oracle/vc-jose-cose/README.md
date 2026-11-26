@@ -159,7 +159,10 @@ suite's own table. Today that is 35 of 35, and nothing here says so.
 
 ## Run it locally
 
-Docker and Node 24 are needed: the suite's own mocha does not start under Node 26. From the repository root:
+Docker and Node 24 are needed: the suite's own mocha does not start under Node 26. The
+harness is built on the host and mounted into a Linux container (`compose.yml`), so this
+runs on Linux only, with a glibc no newer than the image's (Debian 13, glibc 2.41). On
+another system the container cannot execute the binary. From the repository root:
 
 ```bash
 cargo build --locked -p dpp-tests --bin vc-jose-cose-suite
