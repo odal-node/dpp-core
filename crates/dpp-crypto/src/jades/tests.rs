@@ -17,7 +17,7 @@ const B64: base64::engine::general_purpose::GeneralPurpose =
 /// A stand-in for a DER certificate. The bytes are never parsed by this module
 /// — `x5t#S256` digests them and `x5c` carries them — so a fixed blob is enough
 /// to exercise the format without pulling in a certificate generator.
-const FAKE_DER: &[u8] = b"\x30\x82\x01\x0a-not-a-real-certificate-";
+pub(super) const FAKE_DER: &[u8] = b"\x30\x82\x01\x0a-not-a-real-certificate-";
 
 fn header() -> JadesHeader {
     JadesHeader {
@@ -740,23 +740,32 @@ fn a_header_with_an_empty_thumbprint_is_refused_like_an_empty_chain() {
     );
 }
 
-/// 🚨 The boundary, asserted so it is not read as coverage: a thumbprint that is
-/// present but is **not** the digest of `chain[0]` is still accepted.
-///
-/// That is a question about whether the reference is *correct*, where this
-/// method's scope is whether the format is *present*. Answering it needs the
-/// DER to hash, which a predicate on the header does not have. Recorded here so
-/// the next reader knows it was considered rather than missed — if this starts
-/// failing, the scope has widened and this test should be replaced by one
-/// asserting the match.
+/// A thumbprint that is not the digest of `chain[0]` still answers the
+/// predicate, which checks presence only. Serialising the header is where the
+/// two halves are compared, and it refuses the pair, so a header whose digest
+/// names another certificate is never written.
 #[test]
-fn a_thumbprint_that_does_not_match_the_chain_is_still_accepted_and_this_is_the_boundary() {
+fn a_thumbprint_of_another_certificate_is_refused_on_serialise() {
+    let CertificateRef::Thumbprint(other) =
+        CertificateRef::thumbprint_of_der(b"another certificate")
+    else {
+        unreachable!("thumbprint_of_der always yields a Thumbprint");
+    };
     let mismatched = CertificateRef::ChainWithThumbprint {
         chain: vec!["Y2VydA==".into()],
-        thumbprint: "not-the-digest-of-that-certificate".into(),
+        thumbprint: other,
     };
     assert!(
         mismatched.is_eu_recognised_profile(),
-        "if this now fails, the predicate checks correspondence and this test is stale"
+        "the predicate checks presence, so a digest of another certificate still answers true"
+    );
+    let h = JadesHeader {
+        certificate: mismatched,
+        ..header()
+    };
+    assert_eq!(
+        h.to_json_bytes()
+            .expect_err("a digest of another certificate is refused"),
+        JadesError::ThumbprintMismatch
     );
 }
