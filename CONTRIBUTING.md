@@ -134,8 +134,8 @@ runs inside a host as Wasm, so none of those crates may appear anywhere in
 ### Where a file goes
 
 [`docs/architecture/CODE-LAYOUT.md`](docs/architecture/CODE-LAYOUT.md) is the standard:
-one public type per file, `mod.rs` is a pure index, tests live in sibling files rather
-than inline, every file opens with a `//!` doc comment, and only `lib.rs` sits at a
+one public type per file, `mod.rs` is a pure index, tests live in a `tests` directory rather
+than beside or inside the source, every file opens with a `//!` doc comment, and only `lib.rs` sits at a
 crate's `src/` root.
 
 Tests in `crates/dpp-tests/tests/` enforce most of these rules, so `just check` reports
@@ -183,7 +183,7 @@ Code passes `cargo clippy --workspace --all-targets --all-features -- -D warning
 
 | Kind | Where | Scope |
 |---|---|---|
-| Unit tests | a sibling `tests.rs` (or `<name>_tests.rs`) next to the code | Pure logic |
+| Unit tests | the module's own `tests/` directory, `src/<module>/tests/`, declared once as `#[cfg(test)] mod tests;` | Pure logic, and anything that needs a private item |
 | Crate integration tests | `crates/<crate>/tests/` | One crate's public API |
 | Cross-crate and structural tests | `crates/dpp-tests/tests/` | Behaviour across crates, layout rules, documentation drift |
 | Doctests | each crate's README and doc comments | The examples readers copy |

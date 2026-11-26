@@ -20,7 +20,7 @@ pub mod parameters;
 pub mod thresholds;
 
 #[cfg(test)]
-mod golden_vectors;
+mod tests;
 
 pub use calculator::{Co2eResult, LifecycleStage, MaterialLineResult, calculate};
 pub use parameters::{Co2eInputs, MaterialFootprint};

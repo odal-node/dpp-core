@@ -7,7 +7,7 @@ pub mod degradation;
 pub mod due_diligence;
 pub mod passport_content;
 pub mod passport_scope;
-#[cfg(test)]
-mod passport_scope_tests;
 pub mod recycled_content;
 pub mod schedule;
+#[cfg(test)]
+mod tests;

@@ -65,6 +65,3 @@ pub use header::{CertificateRef, JadesError, JadesHeader};
 
 #[cfg(test)]
 mod tests;
-
-#[cfg(test)]
-mod certificate_ref_tests;

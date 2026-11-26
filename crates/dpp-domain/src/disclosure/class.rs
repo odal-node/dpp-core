@@ -140,7 +140,7 @@ impl Disclosure {
     /// no class means "withheld from both". The tie-break returns `Individual`,
     /// which is a choice rather than a derivation, and it is only ever reached
     /// by a policy that declares one field name in both classes. That is an
-    /// authoring error a schema cannot commit: `access::tests` rejects it at
+    /// authoring error a schema cannot commit: `access::tests::audience` rejects it at
     /// build time.
     #[must_use]
     pub const fn most_restrictive(self, other: Self) -> Self {

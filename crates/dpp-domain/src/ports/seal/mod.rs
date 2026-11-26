@@ -59,9 +59,9 @@
 /// `SealPort`, so the checks do too, and `ports/mod.rs` stays an inventory of
 /// ports — which the `ports_inventory` tripwire holds it to.
 pub mod conformance;
-#[cfg(test)]
-mod conformance_tests;
 mod port;
+#[cfg(test)]
+mod tests;
 
 pub use port::SealPort;
 

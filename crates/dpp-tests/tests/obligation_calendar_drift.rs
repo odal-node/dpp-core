@@ -59,13 +59,16 @@ fn source_files(dir: &Path, out: &mut Vec<PathBuf>) {
     for entry in entries.flatten() {
         let path = entry.path();
         if path.is_dir() {
-            source_files(&path, out);
+            // A `tests` directory is the test module: see the doc above.
+            if path.file_name().and_then(|n| n.to_str()) != Some("tests") {
+                source_files(&path, out);
+            }
             continue;
         }
         let Some(name) = path.file_name().and_then(|n| n.to_str()) else {
             continue;
         };
-        if name.ends_with(".rs") && name != "tests.rs" && !name.ends_with("_tests.rs") {
+        if name.ends_with(".rs") {
             out.push(path);
         }
     }

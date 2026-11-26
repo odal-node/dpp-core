@@ -12,12 +12,6 @@
 //! - `register` — [`VocabularyRegister`] itself, plus the embedded records.
 //! - `verdict` — [`Verdict`], the answer the gate gives and the reason with it.
 
-#[cfg(test)]
-mod ledger_tests;
-#[cfg(test)]
-mod pin_tests;
-#[cfg(test)]
-mod prose_tests;
 #[allow(clippy::module_inception)]
 mod register;
 #[cfg(test)]

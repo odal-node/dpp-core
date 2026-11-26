@@ -80,7 +80,7 @@ A few files are scaffolding without rules yet (`common::units`, `textiles::care`
 2. Write a pure function with borrowed primitive inputs (`&str`, `f64`, `&[T]`), no
    owned allocations in its arguments.
 3. Return `Result<(), String>` from a validator and `bool` from a predicate.
-4. Add tests in a sibling test file.
+4. Add tests in the module's `tests/` directory.
 5. If callers in `dpp-domain` or `dpp-plugin-sdk` need it without the module path, add a
    `pub use` in `lib.rs`.
 6. Run `cargo test -p dpp-rules`, then `just check`.

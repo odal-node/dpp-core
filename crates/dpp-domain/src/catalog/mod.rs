@@ -46,8 +46,6 @@ pub mod retention;
 pub mod status;
 
 #[cfg(test)]
-mod parity_tests;
-#[cfg(test)]
 mod tests;
 
 pub use descriptor::ProductGroupDescriptor;

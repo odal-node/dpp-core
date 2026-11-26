@@ -49,7 +49,7 @@ pub mod parameters;
 pub mod thresholds;
 
 #[cfg(test)]
-mod golden_vectors;
+mod tests;
 
 pub use calculator::{MetalShortfall, RecycledContentResult, calculate};
 pub use parameters::RecycledContentInputs;

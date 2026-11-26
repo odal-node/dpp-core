@@ -41,8 +41,6 @@
 mod bundle_origin;
 #[cfg(feature = "bundle")]
 mod bundle_schedule;
-#[cfg(all(test, feature = "bundle"))]
-mod bundle_tests;
 #[cfg(feature = "bundle")]
 mod error;
 mod obligation_calendar;

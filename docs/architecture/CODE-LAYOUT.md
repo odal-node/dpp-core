@@ -129,7 +129,7 @@ go into its own named file as a module grows.
 `validation/batch.rs`, not one file per three-line helper. **Not enforced**, on purpose;
 see §5.
 
-### Rule 4: a `tests.rs` splits when it passes 400 lines
+### Rule 4: a file in a `tests` directory splits when it passes 400 lines
 
 Along the same seams as its source. A test file nobody can navigate is one nobody reads
 before changing the code it covers.
@@ -139,6 +139,12 @@ navigability, not a measurement, and enforcing a judgement to the line causes ch
 407-line file gets split at whichever seam is nearest, rarely the one a reader wanted.
 Write to 400. A file inside the 100-line tolerance conforms and needs no
 `LAYOUT-DEVIATION` marker.
+
+**It governs every file inside a `tests` directory under `src/`**, whatever the file is
+called: the name no longer says "test", so the directory is what identifies one (rule 7).
+The crate-level `tests/` directories (`crates/<crate>/tests/`) are not governed: each
+file there is a test binary of its own, and several run past 500 lines today. Splitting
+them is a separate piece of work, not something this rule asks for.
 
 ### Rule 5: an enum with `impl` gravity is a type under rule 1
 
@@ -150,14 +156,47 @@ parent's field may stay in the parent's file.
 Everything else lives in a directory module. The permitted exceptions are `main.rs`, for a
 binary target, and `test_support.rs` (rule 9).
 
-### Rule 7: tests live in a sibling file, never inline
+### Rule 7: a test lives in a directory named `tests`, and nowhere else
 
-`tests.rs` beside the module, or `golden_vectors.rs` where the module implements a
-published methodology and its tests are the vectors. No `#[cfg(test)] mod tests {}` block
-inside a source file.
+- A test that uses only the crate's public API may live in the crate's own `tests/`
+  directory (`crates/<crate>/tests/`, `plugins/<plugin>/tests/`).
+- A test that needs a private item lives in the `tests/` directory of the module it
+  tests, `src/<module>/tests/`. The module declares it once, `#[cfg(test)] mod tests;`;
+  for `lib.rs` or `main.rs` the crate root's tests are `src/tests/`. `tests/mod.rs` is a
+  pure index (rule 2). Helpers that several of its files share go in `tests/common.rs`,
+  and fixture data that only those tests read in `tests/fixtures/`. Fixture data that
+  non-test code or another crate reads stays where it is.
+- **No file or directory inside a `tests/` directory has `test` or `tests` as a word in
+  its name**, words being what the `_`s separate. The directory already says it, so a
+  file is named for what it checks: `jose/tests/audience.rs`, not
+  `jose/tests/audience_tests.rs`, and `jose/tests/oracle/`, not `jose/tests/oracle_tests/`.
+  A module-wide test file is named for the item it covers (`keystore/tests/store.rs`).
+  This is rule 12 applied to the test tree. Data under `fixtures/` keeps the names its
+  upstream gave it, so the Wycheproof `*_test.json` files stay as they are.
+- Not covered: doctests, which are documentation and stay in `///`; compile-time
+  assertions (`const _: () = …`); and `test_support.rs`, which rule 9 makes scaffolding.
 
-The reason is rule 4: inline tests have no size of their own, so nothing can tell you when
-they have outgrown their file.
+The check fails on `#[test]`, `#[tokio::test]` or `proptest!` in any file under `src/`
+outside a `tests/` directory, on an inline `mod tests {` or `mod <name>_tests {`, and on
+a `mod <name>_tests;` declaration. A second check fails on any name inside a `tests/`
+directory, crate-level ones included, that carries the word.
+
+**Why a directory.** Rule 7 used to keep tests out of source files and leave them beside
+the source, and a module's listing filled with them: `dpp-vc`'s `jose/` held 28 test
+files next to 19 source files. A directory gives the tests a place of their own and
+leaves the source listing about its subject. It is also what lets rule 4 see a test file
+by where it is rather than by what it is called.
+
+**Why not the crate's `tests/` alone.** Cargo builds each file there as a separate crate
+that sees only the public API, and when this rule was decided at least 104 of the
+269 test files under `src/` called a private function of their own module. Moving them
+would have meant widening the published API, or rewriting the tests. A module's `tests/`
+directory keeps that access, and keeps one unit-test binary per crate.
+
+**Why no `test` word.** A file in `tests/` that says `_tests` repeats its directory,
+which is the fault rule 12 names for any other directory. Naming the file for its
+subject is also what makes the listing readable: `sd_jwt/claims.rs`, not
+`sd_jwt_claims_tests.rs`.
 
 **Any test-named module counts, not only `tests`.** The check matched `mod tests {` alone
 until 2026-08-25 and so missed five modules named for their subject
@@ -176,6 +215,11 @@ One name, one place: the crate root, feature-gated. Not `fixtures.rs`, not `help
 It is the one file rule 6 allows beside `lib.rs`, because scaffolding that is hard to
 find gets rewritten instead of reused.
 
+**It is scaffolding, not a test file.** Other crates' tests import it, so it ships
+behind a feature and sits outside every `tests/` directory, and it holds no `#[test]`.
+Helpers that only one module's tests use are not scaffolding: they go in that module's
+`tests/common.rs` (rule 7).
+
 ### Rule 10: integration tests are named for their kind *(guidance)*
 
 In `crates/dpp-tests/tests/`, a **tripwire** (a test that asserts a structural or
@@ -184,6 +228,9 @@ document, and otherwise `domain_concerns`, `ports_inventory`, `mod_rs_is_pure_in
 `open_product_group_lane`, `provisional_schema_marker`, `schema_conformity`. Behavioural
 tests are named for the behaviour (`battery_end_to_end`, `access_gatekeeping`,
 `transfer_of_responsibility`).
+
+Neither kind carries the word `test`: the directory says it already (rule 7), and
+`layout::rule_7_no_test_word_inside_tests` fails on a crate-level file that does.
 
 They fail for different reasons and are read by different people: a red tripwire means
 the repository drifted from its own rules, and a red behavioural test means the code is
@@ -204,11 +251,11 @@ test file, a helper), it becomes a directory:
 <concept>/
 ├── mod.rs        always: a pure index (rule 2)
 ├── error.rs      optional: only if this module owns an error nothing else shares
-├── tests.rs      when it has tests; tests/ once past 400 lines (rule 4, checked at 500)
+├── tests/        when it has unit tests: a pure index and one file per subject (rule 7)
 └── <part>.rs     one file per public type with gravity (rule 1)
 ```
 
-**Only `mod.rs` is constant.** `error.rs` and `tests.rs` appear when the module needs
+**Only `mod.rs` is constant.** `error.rs` and `tests/` appear when the module needs
 them, and a module whose errors are shared with its siblings uses the one at the level
 where the sharing happens (rule 15). Beyond those names each directory carries whatever
 its subject needs; the fixed names exist so that the *rest* of the listing is the subject.
@@ -219,7 +266,7 @@ its subject needs; the fixed names exist so that the *rest* of the listing is th
 their nearest common parent, not in either.
 
 The shape makes a module skimmable without opening it. Every directory draws on the same
-three fixed names, `mod.rs`, `error.rs` and `tests.rs`, so anything else in the listing is
+three fixed names, `mod.rs`, `error.rs` and `tests/`, so anything else in the listing is
 a `<part>.rs`, and the parts are the subject.
 
 ### Rule 12: a file never repeats the name of its directory
@@ -305,7 +352,7 @@ A rule with no escape hatch is deleted the first time it is inconvenient. A rule
 ## 4. What enforces what
 
 Every enforced rule except rule 2 lives in `crates/dpp-tests/tests/layout.rs`, one
-`#[test]` each, sharing one directory walk. Rule 2 has its own file because it predates
+`#[test]` each (rule 7 has two), sharing one directory walk. Rule 2 has its own file because it predates
 the rest.
 
 | Rule | Test | Fails when |
@@ -313,9 +360,10 @@ the rest.
 | 1, 5 | `layout::rule_1_one_public_type_per_file` | a source file declares 3 or more public types |
 | 2 | `mod_rs_is_pure_index` | a `mod.rs` declares a public item |
 | 3 | none | *guidance only* |
-| 4 | `layout::rule_4_tests_files_are_navigable` | a `tests.rs` exceeds 500 lines (400 target plus 100 tolerance) |
+| 4 | `layout::rule_4_tests_files_are_navigable` | a file in a `tests/` directory under `src/` exceeds 500 lines (400 target plus 100 tolerance) |
 | 6, 9 | `layout::rule_6_only_lib_rs_at_src_root` | a crate has a root `.rs` other than `lib.rs`, `main.rs` or `test_support.rs` |
-| 7 | `layout::rule_7_tests_are_siblings_not_inline` | a source file contains an inline test module: `mod tests {` or `mod <name>_tests {`, `pub` or not |
+| 7 | `layout::rule_7_tests_live_in_a_tests_directory` | a file under `src/` outside a `tests/` directory holds a `#[test]`, `#[tokio::test]` or `proptest!`, an inline `mod tests {` or `mod <name>_tests {`, or a `mod <name>_tests;` declaration |
+| 7 | `layout::rule_7_no_test_word_inside_tests` | a file or directory inside any `tests/` directory, crate-level ones included, has `test` or `tests` as a word in its name (`fixtures/` excepted) |
 | 8 | `layout::rule_8_every_file_has_module_docs` | a `.rs` file has no `//!` in its first three lines |
 | 10 | none | *guidance only* |
 | 0 | `layout::rule_0_tier_imports_point_up` | a module imports a higher tier, or is missing from the tier table |
@@ -335,8 +383,7 @@ implying the test is the rule:
 
 - **Rule 11.** A test cannot tell whether two files are one concept. It can tell that
   `gtin.rs` sits beside `gtin_check_digit.rs`, which is what an outgrown concept looks
-  like from outside. A `*_tests.rs` companion is excluded: it is the sibling test file
-  rules 4 and 7 *require*, and flagging it would put two rules in contradiction.
+  like from outside.
 - **Rule 15.** "Shared" is a claim about intent, so the check reads a roster of bucket
   names rather than discovering them. It counts *distinct siblings*, not mentions, and
   does not count a `mod.rs`: re-exporting a type is indexing it, not using it, and
@@ -391,7 +438,8 @@ go red, revert. A check nobody has watched fail may not be wired up at all.
 §2's rules govern `crates/*/src/`, `plugins/*/src/` and `crates/dpp-tests/tests/`. §1's
 scope rule governs the same trees. Rule 13 reaches further, because it is about directory
 names rather than code: it also governs `crates/`, `plugins/` and the data directories
-beside them.
+beside them. Rule 7's naming check reaches the crate-level `tests/` directories as well,
+since a `_tests` file is as redundant there as under `src/`; rule 4 does not.
 
 ### Most layout changes are invisible. The scope rule is not.
 

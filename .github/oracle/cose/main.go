@@ -6,7 +6,7 @@
 //	go run . issue <issued.json>
 //
 // `corpus.json` comes from
-// `EMIT_COSE_CORPUS=1 cargo test -p dpp-vc --lib jose::oracle_tests::cose_emit`. See
+// `EMIT_COSE_CORPUS=1 cargo test -p dpp-vc --lib jose::tests::oracle::cose::emit`. See
 // `.github/workflows/cose-oracle.yml` for what is checked and what is not.
 package main
 

@@ -161,27 +161,7 @@ mod vct;
 mod verify;
 
 #[cfg(test)]
-mod algorithm_tests;
-#[cfg(test)]
-mod claim_path_tests;
-#[cfg(test)]
-mod expiry_tests;
-#[cfg(test)]
-mod issuer_metadata_tests;
-#[cfg(test)]
-mod key_binding_tests;
-#[cfg(test)]
-mod passport_claim_tests;
-#[cfg(test)]
-mod status_tests;
-#[cfg(test)]
-mod test_fixtures;
-#[cfg(test)]
 mod tests;
-#[cfg(test)]
-mod validity_tests;
-#[cfg(test)]
-mod vct_tests;
 
 pub use error::SdJwtVcError;
 pub use issue::{Issuance, issue};

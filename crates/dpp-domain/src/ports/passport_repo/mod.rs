@@ -26,16 +26,8 @@
 //! [`list`]: PassportRepository::list
 //! [`count`]: PassportRepository::count
 
-#[cfg(test)]
-mod carrier_lookup_tests;
-#[cfg(test)]
-mod identifier_lookup_tests;
 mod port;
-#[cfg(test)]
-mod product_identifier_lookup_tests;
 mod protected_fields;
-#[cfg(test)]
-mod protected_fields_tests;
 #[cfg(test)]
 mod tests;
 

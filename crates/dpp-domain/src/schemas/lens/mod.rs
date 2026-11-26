@@ -15,13 +15,11 @@
 //! schemas they bridge); an expression/bundle-delivered form can come later.
 
 mod builtin;
-#[cfg(test)]
-mod builtin_tests;
 mod derived_view;
-
-mod registry;
 #[cfg(test)]
 mod tests;
+
+mod registry;
 mod transform;
 mod upcast_error;
 

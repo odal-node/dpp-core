@@ -43,17 +43,7 @@ mod status;
 mod token;
 
 #[cfg(test)]
-mod draft_vectors_tests;
-#[cfg(test)]
-mod list_tests;
-#[cfg(test)]
-mod reference_tests;
-#[cfg(test)]
-mod status_tests;
-#[cfg(test)]
-mod test_fixtures;
-#[cfg(test)]
-mod token_tests;
+mod tests;
 
 pub use error::TokenStatusListError;
 pub use list::{MAX_DECODED_BYTES, TokenStatusList};

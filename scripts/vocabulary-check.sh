@@ -43,7 +43,7 @@ while IFS= read -r file; do
     awk '/^[[:space:]]*#\[cfg\(test\)\]/ { exit }
          { if ($0 ~ /^[[:space:]]*\/\//) print ""; else print }' "$file" > "$VIEW/$file"
 done < <(find crates/*/src -name '*.rs' -type f 2> /dev/null \
-    | grep -v -E '/(tests|oracle_tests)/|/tests\.rs$|_tests\.rs$' | sort)
+    | grep -v -E '/tests/' | sort)
 
 production() (
     cd "$VIEW" || exit 1

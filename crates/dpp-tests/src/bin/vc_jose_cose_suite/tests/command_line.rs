@@ -1,6 +1,8 @@
 //! The harness run as the suite runs it: arguments in, a verdict file out.
 
-use super::*;
+use super::common::*;
+use serde_json::Value;
+use std::path::PathBuf;
 
 /// A scratch directory holding the input and key files of one run.
 struct Run(PathBuf);

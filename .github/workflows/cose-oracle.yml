@@ -114,7 +114,7 @@ jobs:
           go list -m all
 
       - name: Build the corpus from our own issuer
-        run: EMIT_COSE_CORPUS=1 cargo test -p dpp-vc --lib jose::oracle_tests::cose_emit
+        run: EMIT_COSE_CORPUS=1 cargo test -p dpp-vc --lib jose::tests::oracle::cose::emit
 
       - name: Judge the corpus and the suite's own inputs
         working-directory: .github/oracle/cose
@@ -129,7 +129,7 @@ jobs:
         run: go run . issue ../../../target/cose-oracle/issued.json
 
       - name: Verify what it signed
-        run: CHECK_COSE_ORACLE_ISSUED=target/cose-oracle/issued.json cargo test -p dpp-vc --lib jose::oracle_tests::cose_reverse -- --nocapture
+        run: CHECK_COSE_ORACLE_ISSUED=target/cose-oracle/issued.json cargo test -p dpp-vc --lib jose::tests::oracle::cose::reverse -- --nocapture
 
       # Our own signatures are RFC 6979 deterministic, so the corpus must be byte for byte
       # the same. The library's are not: ECDSA draws a fresh nonce for every signature. So
@@ -140,10 +140,10 @@ jobs:
           GOFLAGS: -mod=readonly
         run: |
           (cd target/cose-oracle && sha256sum corpus.json > first.sha256)
-          EMIT_COSE_CORPUS=1 cargo test -p dpp-vc --lib jose::oracle_tests::cose_emit
+          EMIT_COSE_CORPUS=1 cargo test -p dpp-vc --lib jose::tests::oracle::cose::emit
           (cd target/cose-oracle && sha256sum --check first.sha256)
           (cd .github/oracle/cose && go run . issue ../../../target/cose-oracle/issued-again.json)
-          CHECK_COSE_ORACLE_ISSUED=target/cose-oracle/issued-again.json cargo test -p dpp-vc --lib jose::oracle_tests::cose_reverse -- --nocapture
+          CHECK_COSE_ORACLE_ISSUED=target/cose-oracle/issued-again.json cargo test -p dpp-vc --lib jose::tests::oracle::cose::reverse -- --nocapture
 
       # What failed, in a form that can be read without rerunning anything.
       - name: Keep the corpus

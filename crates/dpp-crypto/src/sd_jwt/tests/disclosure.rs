@@ -1,0 +1,497 @@
+//! RFC 9901 mechanism tests.
+//!
+//! The properties here are the specification's, not a passport's — a passport
+//! credential is `dpp-vc` and is tested there. What is pinned is that the
+//! digests, salts and combined format behave as clause 4 and clause 7 say.
+
+use serde_json::{Map, Value, json};
+
+use super::super::builder::{SdJwt, build_payload, conceal};
+use super::super::disclosure::{Disclosure, digest_of};
+use super::super::error::{DisclosureError, SdJwtError};
+
+/// Sign nothing — these tests exercise the disclosure mechanism, and the JWS
+/// check is [`crate::jws::verifier`]'s. A stub JWT with a real payload is all
+/// the mechanism needs, and using one keeps a key out of tests that do not
+/// depend on signing.
+pub(super) fn stub_jwt(payload: &Value) -> String {
+    use base64::Engine;
+    let b64 = base64::engine::general_purpose::URL_SAFE_NO_PAD;
+    format!(
+        "{}.{}.{}",
+        b64.encode(br#"{"alg":"EdDSA","typ":"dc+sd-jwt"}"#),
+        b64.encode(payload.to_string()),
+        b64.encode([0u8; 64])
+    )
+}
+
+pub(super) fn sample() -> Map<String, Value> {
+    json!({
+        "batteryChemistry": "LFP",
+        "cathodeMaterial": ["LiFePO4"],
+        "stateOfHealthPct": 87.5,
+        "testReportResults": "report-4471",
+        "safetyMeasures": ["Do not puncture"],
+    })
+    .as_object()
+    .unwrap()
+    .clone()
+}
+
+pub(super) const HIDDEN: [&str; 4] = [
+    "cathodeMaterial",
+    "stateOfHealthPct",
+    "testReportResults",
+    "safetyMeasures",
+];
+
+fn issue() -> SdJwt {
+    let (concealed, disclosures) = conceal(&sample(), |name| HIDDEN.contains(&name)).unwrap();
+    let payload = build_payload(concealed, !disclosures.is_empty());
+    SdJwt::new(stub_jwt(&payload), disclosures)
+}
+
+#[test]
+fn concealed_claims_leave_no_cleartext_in_the_payload() {
+    let (concealed, disclosures) = conceal(&sample(), |name| HIDDEN.contains(&name)).unwrap();
+
+    assert_eq!(disclosures.len(), 4);
+    assert!(concealed.contains_key("batteryChemistry"));
+    for name in HIDDEN {
+        assert!(!concealed.contains_key(name), "{name} left in cleartext");
+    }
+    // Four digests that stand for a claim, and decoys up to the next multiple of eight.
+    assert_eq!(concealed["_sd"].as_array().unwrap().len(), 8);
+}
+
+#[test]
+fn a_full_credential_round_trips_through_the_combined_format() {
+    let issued = issue();
+    let parsed = SdJwt::parse(&issued.serialise()).unwrap();
+
+    assert_eq!(parsed.disclosures().len(), 4);
+    assert!(!parsed.has_key_binding());
+
+    let payload = parsed.disclosed_payload().unwrap();
+    assert_eq!(payload["batteryChemistry"], json!("LFP"));
+    assert_eq!(payload["cathodeMaterial"], json!(["LiFePO4"]));
+    assert_eq!(payload["stateOfHealthPct"], json!(87.5));
+    assert!(!payload.contains_key("_sd"), "_sd survived processing");
+    assert!(!payload.contains_key("_sd_alg"), "_sd_alg survived");
+}
+
+/// The merge-gate property, asserted over the presentation *bytes* rather than
+/// inferred from the construction.
+#[test]
+fn a_two_of_four_presentation_does_not_carry_the_withheld_two() {
+    use base64::Engine;
+    let b64 = base64::engine::general_purpose::URL_SAFE_NO_PAD;
+
+    let issued = issue();
+    let reveal: Vec<String> = ["cathodeMaterial", "stateOfHealthPct"]
+        .iter()
+        .flat_map(|n| issued.digests_for_claim(n))
+        .collect();
+    let reveal: Vec<&str> = reveal.iter().map(String::as_str).collect();
+    let presentation = issued.present(&reveal).unwrap();
+    let wire = presentation.serialise();
+
+    assert_eq!(presentation.disclosures().len(), 2);
+
+    let payload = presentation.disclosed_payload().unwrap();
+    assert_eq!(payload["cathodeMaterial"], json!(["LiFePO4"]));
+    assert_eq!(payload["stateOfHealthPct"], json!(87.5));
+    assert!(!payload.contains_key("testReportResults"));
+    assert!(!payload.contains_key("safetyMeasures"));
+
+    // Not in the wire bytes, and not in any base64url segment of them either.
+    let decoded: String = wire
+        .split('~')
+        .flat_map(|s| s.split('.'))
+        .filter_map(|s| b64.decode(s).ok())
+        .map(|b| String::from_utf8_lossy(&b).into_owned())
+        .collect::<Vec<_>>()
+        .join("|");
+    for needle in [
+        "report-4471",
+        "Do not puncture",
+        "testReportResults",
+        "safetyMeasures",
+    ] {
+        assert!(!wire.contains(needle), "{needle} is in the presentation");
+        assert!(
+            !decoded.contains(needle),
+            "{needle} decodes out of a segment"
+        );
+    }
+
+    // The issuer-signed JWT is forwarded unchanged, so the signature over it
+    // still covers exactly what it covered at issuance.
+    assert_eq!(presentation.jwt(), issued.jwt());
+}
+
+/// Tampering with a revealed value breaks its digest, and clause 7.1 step 4
+/// then makes the whole credential unreadable rather than dropping the claim.
+#[test]
+fn a_tampered_disclosure_is_refused_not_ignored() {
+    let issued = issue();
+    let original = &issued.disclosures()[0];
+    let forged = Disclosure::with_salt(
+        original.salt().to_owned(),
+        original
+            .claim_name()
+            .expect("a property disclosure has a name"),
+        json!("forged"),
+    )
+    .unwrap();
+    assert_ne!(forged.digest(), original.digest());
+
+    let tampered = SdJwt::new(issued.jwt().to_owned(), vec![forged]);
+    assert_eq!(
+        tampered.disclosed_payload(),
+        Err(SdJwtError::UnusedDisclosures(1))
+    );
+}
+
+#[test]
+fn a_disclosure_naming_a_cleartext_claim_is_refused() {
+    let issued = issue();
+    let collides = Disclosure::new("batteryChemistry", json!("NMC")).unwrap();
+    // Put its digest in the token so it is *found*, which is what isolates the
+    // collision check from the unused-disclosure one.
+    let payload = json!({
+        "batteryChemistry": "LFP",
+        "_sd": [collides.digest()],
+        "_sd_alg": "sha-256",
+    });
+    let sd = SdJwt::new(stub_jwt(&payload), vec![collides]);
+    assert_eq!(
+        sd.disclosed_payload(),
+        Err(SdJwtError::ClaimCollision("batteryChemistry".to_owned()))
+    );
+    let _ = issued;
+}
+
+#[test]
+fn a_present_but_unsupported_sd_alg_is_refused_rather_than_assumed() {
+    let payload = json!({ "_sd": [], "_sd_alg": "sha-512" });
+    let sd = SdJwt::new(stub_jwt(&payload), vec![]);
+    assert_eq!(
+        sd.disclosed_payload(),
+        Err(SdJwtError::UnsupportedHashAlg("sha-512".to_owned()))
+    );
+}
+
+#[test]
+fn an_absent_sd_alg_means_sha_256() {
+    let d = Disclosure::new("x", json!(1)).unwrap();
+    let payload = json!({ "_sd": [d.digest()] });
+    let sd = SdJwt::new(stub_jwt(&payload), vec![d]);
+    assert_eq!(sd.disclosed_payload().unwrap()["x"], json!(1));
+}
+
+#[test]
+fn nothing_concealed_means_no_sd_claim() {
+    let (concealed, disclosures) = conceal(&sample(), |_| false).unwrap();
+    assert!(disclosures.is_empty());
+    assert!(!concealed.contains_key("_sd"));
+    let payload = build_payload(concealed, false);
+    assert!(payload.get("_sd_alg").is_none());
+}
+
+#[test]
+fn a_disclosure_survives_a_parse_and_reencode_unchanged() {
+    let d = Disclosure::new("cathodeMaterial", json!(["LiFePO4"])).unwrap();
+    let back = Disclosure::parse(d.encoded()).unwrap();
+    assert_eq!(back, d);
+    assert_eq!(back.digest(), d.digest());
+}
+
+#[test]
+fn reserved_claim_names_are_refused() {
+    use base64::Engine;
+    let b64 = base64::engine::general_purpose::URL_SAFE_NO_PAD;
+    for name in ["_sd", "...", "_sd_alg"] {
+        let encoded = b64.encode(json!(["salt", name, 1]).to_string());
+        assert_eq!(
+            Disclosure::parse(&encoded),
+            Err(DisclosureError::ReservedClaimName)
+        );
+    }
+}
+
+#[test]
+fn an_array_of_any_length_but_two_or_three_is_refused() {
+    use base64::Engine;
+    let b64 = base64::engine::general_purpose::URL_SAFE_NO_PAD;
+    for shape in [
+        json!(["salt"]),
+        json!(["salt", "name", "value", "extra"]),
+        json!([]),
+        json!({ "salt": "x" }),
+        json!(["salt", 5, "value"]),
+        json!([5, "value"]),
+    ] {
+        assert_eq!(
+            Disclosure::parse(&b64.encode(shape.to_string())),
+            Err(DisclosureError::NotATripleOrPair),
+            "{shape}"
+        );
+    }
+}
+
+#[test]
+fn a_token_without_a_trailing_separator_is_not_an_sd_jwt() {
+    assert!(matches!(
+        SdJwt::parse("onlyonesegment"),
+        Err(SdJwtError::NotAnSdJwt)
+    ));
+}
+
+#[test]
+fn a_key_binding_segment_is_seen_and_not_read_as_a_disclosure() {
+    let issued = issue();
+    let kb = stub_jwt(&json!({ "iat": 1 }));
+    let parsed = SdJwt::parse(&format!("{}{kb}", issued.serialise())).unwrap();
+    assert_eq!(parsed.disclosures().len(), 4);
+    assert!(parsed.has_key_binding());
+}
+
+/// Clause 4: a token ends in `~`, or in a Key Binding JWT. A last Disclosure that
+/// lost its closing `~` is neither, and was once taken for a Key Binding JWT: the
+/// claim it carried went missing from the result and nothing said so.
+#[test]
+fn a_last_disclosure_missing_its_closing_separator_is_refused_not_dropped() {
+    let cut = issue().serialise().trim_end_matches('~').to_owned();
+    assert!(matches!(
+        SdJwt::parse(&cut),
+        Err(SdJwtError::MalformedKeyBinding)
+    ));
+}
+
+#[test]
+fn a_key_binding_segment_that_is_not_a_compact_jws_is_refused() {
+    let token = issue().serialise();
+    for not_a_jws in ["kb-jwt-placeholder", "a.b", "a.b.c.d", "a..c", "a.b.c d"] {
+        assert!(
+            matches!(
+                SdJwt::parse(&format!("{token}{not_a_jws}")),
+                Err(SdJwtError::MalformedKeyBinding)
+            ),
+            "{not_a_jws:?}"
+        );
+    }
+}
+
+/// Clause 7.1 step 3.b.i reads only an `_sd` that "refers to an array of
+/// strings". One that does not carries no digests, so a Disclosure its sibling
+/// strings would have matched is left unreferenced (step 5) and the token is
+/// refused, rather than half of the array being read.
+#[test]
+fn an_sd_array_holding_a_non_string_carries_no_digests() {
+    let d = Disclosure::new("x", json!(1)).unwrap();
+    let payload = json!({ "_sd": [d.digest(), 7], "_sd_alg": "sha-256" });
+    let sd = SdJwt::new(stub_jwt(&payload), vec![d]);
+    assert_eq!(
+        sd.disclosed_payload(),
+        Err(SdJwtError::UnusedDisclosures(1))
+    );
+}
+
+/// Clause 4.1.1: `_sd_alg` "MUST NOT be used in any object nested within the
+/// payload", and step 3.f removes it from the top level only. A nested one is a
+/// claim the issuer was not allowed to make, not an artefact to strip silently.
+#[test]
+fn sd_alg_inside_a_nested_object_is_refused() {
+    let payload = json!({ "_sd_alg": "sha-256", "nested": { "_sd_alg": "sha-256" } });
+    let sd = SdJwt::new(stub_jwt(&payload), vec![]);
+    assert_eq!(sd.disclosed_payload(), Err(SdJwtError::NestedHashAlg));
+}
+
+#[test]
+fn sd_alg_inside_a_disclosed_object_is_refused() {
+    let d = Disclosure::new("o", json!({ "_sd_alg": "sha-256" })).unwrap();
+    let payload = json!({ "_sd": [d.digest()], "_sd_alg": "sha-256" });
+    let sd = SdJwt::new(stub_jwt(&payload), vec![d]);
+    assert_eq!(sd.disclosed_payload(), Err(SdJwtError::NestedHashAlg));
+}
+
+#[test]
+fn digest_of_matches_the_disclosures_own_digest() {
+    let d = Disclosure::new("x", json!("y")).unwrap();
+    assert_eq!(digest_of(d.encoded()), d.digest());
+}
+
+// ── Properties added after review ────────────────────────────────────────────
+
+/// Selecting a presentation by claim name over-discloses when one name occurs
+/// at two places, which RFC 9901 clause 9.3 says it may. Selection is therefore
+/// by digest, and this is the case that proves the difference: two disclosures
+/// share a name, and revealing one must not carry the other.
+#[test]
+fn revealing_one_of_two_same_named_claims_withholds_the_other() {
+    let outer = json!({ "serialNumber": "OUTER" })
+        .as_object()
+        .unwrap()
+        .clone();
+    let inner = json!({ "serialNumber": "INNER" })
+        .as_object()
+        .unwrap()
+        .clone();
+
+    let (mut kept, mut disclosures) = conceal(&outer, |n| n == "serialNumber").unwrap();
+    let (inner_kept, mut inner_disclosures) = conceal(&inner, |n| n == "serialNumber").unwrap();
+    kept.insert("nested".to_owned(), Value::Object(inner_kept));
+    disclosures.append(&mut inner_disclosures);
+
+    let sd = SdJwt::new(stub_jwt(&build_payload(kept, true)), disclosures);
+    assert_eq!(
+        sd.digests_for_claim("serialNumber").len(),
+        2,
+        "fixture must be genuinely ambiguous or this proves nothing"
+    );
+
+    // Reveal only the outer one.
+    let outer_digest = sd.disclosures()[0].digest();
+    let presentation = sd.present(&[outer_digest.as_str()]).unwrap();
+
+    assert_eq!(presentation.disclosures().len(), 1);
+    let wire = presentation.serialise();
+    assert!(wire.contains(sd.disclosures()[0].encoded()));
+    assert!(
+        !wire.contains(sd.disclosures()[1].encoded()),
+        "the same-named sibling rode along — selection is matching on name"
+    );
+}
+
+/// RFC 9901 clause 4.1: "The same digest value MUST NOT appear more than once
+/// in the SD-JWT." Twice among the disclosures supplied.
+#[test]
+fn the_same_disclosure_supplied_twice_is_refused() {
+    let d = Disclosure::new("x", json!(1)).unwrap();
+    let payload = json!({ "_sd": [d.digest()], "_sd_alg": "sha-256" });
+    let sd = SdJwt::new(stub_jwt(&payload), vec![d.clone(), d.clone()]);
+
+    assert_eq!(
+        sd.disclosed_payload(),
+        Err(SdJwtError::DuplicateDigest(d.digest()))
+    );
+}
+
+/// The same clause, in the direction a `HashMap` hides: the digest repeats in
+/// the token's own `_sd` arrays rather than among the disclosures. Unmatched,
+/// so a count-based check still balances and accepts it.
+#[test]
+fn a_digest_repeated_across_two_sd_arrays_is_refused() {
+    let orphan = Disclosure::new("ghost", json!("boo")).unwrap();
+    let payload = json!({
+        "_sd": [orphan.digest()],
+        "_sd_alg": "sha-256",
+        "nested": { "_sd": [orphan.digest()] },
+    });
+    let sd = SdJwt::new(stub_jwt(&payload), vec![]);
+
+    assert_eq!(
+        sd.disclosed_payload(),
+        Err(SdJwtError::DuplicateDigest(orphan.digest()))
+    );
+}
+
+/// A constructor must not be able to build a value this crate's own parser
+/// rejects — clause 4.2.1 forbids `_sd` and `...` as claim names, and `_sd_alg`
+/// is refused with them.
+#[test]
+fn constructors_refuse_reserved_claim_names() {
+    for name in ["_sd", "...", "_sd_alg"] {
+        assert_eq!(
+            Disclosure::new(name, json!(1)),
+            Err(DisclosureError::ReservedClaimName)
+        );
+        assert_eq!(
+            Disclosure::with_salt("salt".to_owned(), name, json!(1)),
+            Err(DisclosureError::ReservedClaimName)
+        );
+    }
+}
+
+/// Everything a constructor builds must survive `parse`, which is the round
+/// trip the reserved-name check exists to keep total.
+#[test]
+fn every_constructed_disclosure_round_trips() {
+    for (name, value) in [
+        ("plain", json!("v")),
+        ("nested", json!({"a": [1, 2, {"b": null}]})),
+        ("unicode", json!("ü \" \\ 🔐")),
+    ] {
+        let d = Disclosure::new(name, value).unwrap();
+        assert_eq!(Disclosure::parse(d.encoded()).unwrap(), d);
+    }
+}
+
+/// Disclosures chained so that each is nested `depth` deep and ends in the
+/// digest of the next. Each one alone is well within `serde_json`'s limit.
+fn nested_chain(links: usize, depth: usize) -> (Value, Vec<Disclosure>) {
+    let mut next: Option<String> = None;
+    let mut disclosures = Vec::new();
+    for link in 0..links {
+        let mut value = next.map_or(json!(1), |digest| json!({ "_sd": [digest] }));
+        for _ in 0..depth {
+            value = json!({ "a": value });
+        }
+        let disclosure = Disclosure::new(format!("link{link}"), value).expect("a disclosure");
+        next = Some(disclosure.digest());
+        disclosures.push(disclosure);
+    }
+    (
+        json!({ "_sd": [next.expect("at least one link")] }),
+        disclosures,
+    )
+}
+
+/// Disclosures nested inside one another go past the bound and are refused.
+#[test]
+fn a_chain_of_deep_disclosures_is_refused() {
+    let (payload, disclosures) = nested_chain(100, 120);
+    let result = SdJwt::new(stub_jwt(&payload), disclosures).disclosed_payload();
+    assert_eq!(result, Err(SdJwtError::TooDeep(127)));
+}
+
+/// The bound is exactly the deepest `serde_json` goes: a single payload nested as
+/// deep as it will parse is read, and one level more, which only a Disclosure can
+/// add, is refused.
+#[test]
+fn the_nesting_bound_is_where_serde_json_stops() {
+    let text = format!("{{\"a\":{}1{}}}", "[".repeat(126), "]".repeat(126));
+    let payload: Value = serde_json::from_str(&text).expect("127 levels, which serde_json reads");
+    assert!(
+        SdJwt::new(stub_jwt(&payload), Vec::new())
+            .disclosed_payload()
+            .is_ok()
+    );
+
+    let deeper = format!("{{\"a\":{}1{}}}", "[".repeat(127), "]".repeat(127));
+    assert!(
+        serde_json::from_str::<Value>(&deeper).is_err(),
+        "serde_json refuses one more"
+    );
+
+    // One link holding a value nested `depth` times sits at depth `depth + 1`.
+    let (payload, disclosures) = nested_chain(1, 126);
+    assert!(
+        SdJwt::new(stub_jwt(&payload), disclosures)
+            .disclosed_payload()
+            .is_ok()
+    );
+    let (payload, disclosures) = nested_chain(1, 127);
+    assert_eq!(
+        SdJwt::new(stub_jwt(&payload), disclosures).disclosed_payload(),
+        Err(SdJwtError::TooDeep(127))
+    );
+}
+
+#[test]
+fn a_chain_within_the_nesting_bound_is_read() {
+    let (payload, disclosures) = nested_chain(2, 60);
+    let result = SdJwt::new(stub_jwt(&payload), disclosures).disclosed_payload();
+    assert!(result.is_ok(), "{result:?}");
+}

@@ -2,48 +2,15 @@
 
 pub mod id;
 #[cfg(test)]
-mod id_tests;
-#[cfg(test)]
-mod rfc9562_vector_tests;
+pub(crate) mod tests;
 
 pub mod carrier;
-#[cfg(test)]
-mod carrier_qualifier_tests;
-#[cfg(test)]
-mod carrier_serial_tests;
 pub mod component;
-#[cfg(test)]
-mod component_tests;
 pub mod derivation;
-#[cfg(test)]
-mod derivation_tests;
 pub mod life_status;
-#[cfg(test)]
-mod life_status_tests;
 pub mod record;
 pub mod reference;
-#[cfg(test)]
-mod reference_tests;
 pub mod view;
-
-#[cfg(test)]
-mod compliance_binding_tests;
-#[cfg(test)]
-mod from_stored_tests;
-#[cfg(test)]
-mod publish_gate_scope_tests;
-#[cfg(test)]
-mod publish_gate_tests;
-#[cfg(test)]
-mod redaction_tests;
-#[cfg(test)]
-mod retention_mutable_fields_tests;
-#[cfg(test)]
-pub(crate) mod tests;
-#[cfg(test)]
-mod validation_tests;
-#[cfg(test)]
-mod wire_keys_tests;
 
 pub use crate::facility::FacilitySnapshot;
 pub use crate::manufacturer::ManufacturerInfo;

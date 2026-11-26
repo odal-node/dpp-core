@@ -9,8 +9,6 @@ mod context;
 mod envelope_terms;
 mod product_terms;
 #[cfg(test)]
-mod product_terms_tests;
-#[cfg(test)]
 mod tests;
 
 pub use context::{

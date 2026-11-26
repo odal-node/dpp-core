@@ -222,65 +222,7 @@ mod verify;
 mod vocabulary;
 
 #[cfg(test)]
-mod algorithm_tests;
-#[cfg(test)]
-mod audience_tests;
-#[cfg(test)]
-mod cose_claims_tests;
-#[cfg(test)]
-mod cose_envelope_tests;
-#[cfg(test)]
-mod cose_sign_tests;
-#[cfg(test)]
-mod cose_support;
-#[cfg(test)]
-mod cose_verify_tests;
-#[cfg(test)]
-mod credentials_tests;
-#[cfg(test)]
-mod data_url_tests;
-#[cfg(test)]
-mod envelope_shape_tests;
-#[cfg(test)]
-mod fixtures_tests;
-#[cfg(test)]
-mod issuer_tests;
-#[cfg(test)]
-mod key_binding_tests;
-#[cfg(test)]
-mod oracle_tests;
-#[cfg(test)]
-mod presentation_tests;
-#[cfg(test)]
-mod properties_tests;
-#[cfg(test)]
-mod sd_jwt_claims_tests;
-#[cfg(test)]
-mod sd_jwt_envelope_tests;
-#[cfg(test)]
-mod sd_jwt_oracle_tests;
-#[cfg(test)]
-mod sd_jwt_refusal_tests;
-#[cfg(test)]
-mod sd_jwt_sign_tests;
-#[cfg(test)]
-mod sd_jwt_verify_tests;
-#[cfg(test)]
-mod sign_tests;
-#[cfg(test)]
-mod suite_cose_tests;
-#[cfg(test)]
-mod suite_issue_tests;
-#[cfg(test)]
-mod suite_sdjwt_tests;
-#[cfg(test)]
-mod suite_tests;
-#[cfg(test)]
-mod temporal_tests;
-#[cfg(test)]
-mod verify_tests;
-#[cfg(test)]
-mod vocabulary_tests;
+mod tests;
 
 pub use cose_sign::{sign_credential_cose, sign_presentation_cose};
 pub use cose_verify::{verify_credential_cose, verify_presentation_cose};

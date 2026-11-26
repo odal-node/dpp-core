@@ -9,29 +9,13 @@
 
 mod change;
 pub mod citation;
-#[cfg(test)]
-mod conformance_shape_tests;
-#[cfg(test)]
-mod conformance_tests;
 pub mod diff;
-#[cfg(test)]
-mod diff_tests;
-#[cfg(test)]
-mod disclosure_nesting_tests;
 mod embedded;
 mod entry;
 pub mod lens;
-#[cfg(test)]
-mod prose_act_reference_tests;
-#[cfg(test)]
-mod prose_citation_tests;
 mod registration_error;
 #[cfg(test)]
-mod serialisation_tests;
-#[cfg(test)]
 mod tests;
-#[cfg(test)]
-mod validation_tests;
 mod versioned;
 
 pub use change::{ChangeKind, PropertyChange};

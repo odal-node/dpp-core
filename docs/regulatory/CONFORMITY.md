@@ -290,7 +290,7 @@ loaded by a host. The plugin ABI includes:
 | Transfer of responsibility | `crates/dpp-tests/tests/transfer_of_responsibility.rs` | Transfer chain, provenance, error cases |
 | Audience gatekeeping | `crates/dpp-tests/tests/access_gatekeeping.rs` | All three audiences, edge cases, custom policies |
 | Schema conformity | `crates/dpp-tests/tests/schema_conformity.rs` | Schema validity and textile field-set regression; not a conformity check |
-| Unit tests | Sibling `tests.rs` files beside each module | Every crate |
+| Unit tests | The `tests/` directory of each module, `src/<module>/tests/` | Every crate |
 
 ## CI gate
 

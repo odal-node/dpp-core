@@ -1,11 +1,7 @@
 //! Battery (EU Battery Regulation 2023/1542).
 
 mod category;
-#[cfg(test)]
-mod category_tests;
 mod chemistry;
-#[cfg(test)]
-mod chemistry_tests;
 mod data;
 mod dynamic_performance;
 mod environmental_reading;
@@ -14,12 +10,12 @@ mod harmful_events;
 mod hazardous_substance;
 mod material_composition;
 mod operator_scope;
-#[cfg(test)]
-mod operator_scope_tests;
 mod state_of_charge_reading;
 mod state_of_health;
 mod status;
 mod temperature_range;
+#[cfg(test)]
+mod tests;
 mod usage_history;
 
 pub use category::BatteryType;

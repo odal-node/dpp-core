@@ -22,17 +22,8 @@ pub mod carbon_footprint;
 pub mod data;
 
 pub mod group;
-#[cfg(test)]
-mod group_tests;
 pub mod payload;
 pub mod repairability_score;
-
-#[cfg(test)]
-mod annex_vii_tests;
-#[cfg(test)]
-mod conformance_tests;
-#[cfg(test)]
-mod serde_tests;
 #[cfg(test)]
 mod tests;
 

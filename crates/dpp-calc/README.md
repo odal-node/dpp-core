@@ -62,21 +62,21 @@ src/
 │   ├── calculator.rs         calculate(inputs, ruleset, clock) → RecycledContentResult
 │   ├── parameters.rs         RecycledContentInputs: the four declared shares
 │   ├── thresholds.rs         RecycledContentRuleset + Art8Phase1Ruleset / Art8Phase2Ruleset
-│   └── golden_vectors.rs     #[cfg(test)], incl. a guard that this agrees with dpp-rules
+│   └── tests/vectors.rs      #[cfg(test)], incl. a guard that this agrees with dpp-rules
 │
 ├── repairability_index/      The enacted EU 2023/1669 Annex IV index
 │   ├── calculator.rs         calculate(inputs, ruleset) → RepairabilityIndexResult
 │   ├── parameters.rs         RepairabilityIndexInputs: 3 part-level parameters over the
 │   │                         10 Annex IV priority parts + 3 product-level, each scored 1 to 5
 │   ├── thresholds.rs         RepairabilityIndexRuleset + Eu2023_1669Ruleset
-│   └── golden_vectors.rs     #[cfg(test)]
+│   └── tests/vectors.rs      #[cfg(test)]
 │
 ├── repairability/            Simplified, non-regulatory six-parameter A to E heuristic
 │   ├── calculator.rs         calculate(inputs, ruleset, clock) → RepairabilityResult
 │   ├── parameters.rs         RepairabilityInputs (6 × u8, ordinal 0 to 2)
 │   ├── thresholds/           RepairabilityRuleset trait + SimplifiedRepairabilityHeuristic,
 │   │                         LaptopRuleset, DisplaysRuleset, WashingMachineRuleset
-│   └── golden_vectors.rs     #[cfg(test)]: A to E coverage, regulatory-basis non-empty CI check
+│   └── tests/vectors.rs      #[cfg(test)]: A to E coverage, regulatory-basis non-empty CI check
 │
 └── co2e/
     ├── calculator.rs         calculate(inputs, ruleset, clock) → Co2eResult (cradle-to-gate,
@@ -85,7 +85,7 @@ src/
     ├── thresholds.rs         Co2eRuleset trait + CradleToGateRuleset
     ├── cfb.rs                CfbRuleset: Ruleset stub + calculate_cfb() STUB
     ├── gwp_factors.rs        Embedded GWP100 characterisation factors (EF 3.1 / AR6, free)
-    └── golden_vectors.rs     #[cfg(test)]
+    └── tests/vectors.rs      #[cfg(test)]
 ```
 
 ### Status
@@ -311,7 +311,7 @@ guide. In short:
 
 1. **A new methodology:** add `src/{methodology}/` with `mod.rs`, `calculator.rs`,
    `parameters.rs`, `thresholds.rs` (its trait extends `Ruleset`) and
-   `golden_vectors.rs`. Register it in `src/ruleset_registry/resolve.rs`.
+   `tests/vectors.rs`. Register it in `src/ruleset_registry/resolve.rs`.
 2. **A new product category for an existing methodology:** add
    `impl Ruleset + impl {Methodology}Ruleset` in that methodology's `thresholds` module
    (a file, or a directory with one file per category as in `repairability/thresholds/`),

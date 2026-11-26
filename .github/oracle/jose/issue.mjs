@@ -6,7 +6,7 @@
  * has the library sign, under EdDSA, ES256, ES384 and ES512 and the suite's own
  * keys: six credentials under each algorithm, and two presentations under each, each
  * enveloping one credential. `dpp_vc::jose::verify_credential`, `verify_presentation`
- * and `verify_credentials` read them (`jose::oracle_tests::reverse`, run with
+ * and `verify_credentials` read them (`jose::tests::oracle::reverse`, run with
  * `CHECK_JOSE_ORACLE_ISSUED`).
  *
  * Locked rule: this workspace signs low-S and verifies both. Node's ECDSA does not

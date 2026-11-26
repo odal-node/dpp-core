@@ -123,6 +123,20 @@ fn read_source(path: &Path) -> Option<String> {
     })
 }
 
+/// Whether `path` sits inside a directory named `tests` below its crate's `src`.
+///
+/// This is where `CODE-LAYOUT.md` rule 7 puts every unit test, so it is also what
+/// every rule that treats test code differently asks.
+fn in_tests_dir(path: &Path) -> bool {
+    let relative = rel(path);
+    let Some((_, after_src)) = relative.split_once("/src/") else {
+        return false;
+    };
+    let mut parts: Vec<&str> = after_src.split('/').collect();
+    parts.pop(); // the file name
+    parts.contains(&"tests")
+}
+
 /// Compare found violations against the baseline and report both directions.
 ///
 /// Fails on a new violation *and* on a stale baseline entry, because a list that
@@ -230,7 +244,7 @@ fn rule_1_one_public_type_per_file() {
             let name = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
             // `mod.rs` is rule 2's problem; `lib.rs` legitimately re-exports;
             // a tests file's fixtures are not the module's public surface.
-            if matches!(name, "mod.rs" | "lib.rs" | "tests.rs" | "golden_vectors.rs") {
+            if matches!(name, "mod.rs" | "lib.rs") || in_tests_dir(&path) {
                 continue;
             }
             let Some(src) = read_source(&path) else {
@@ -260,16 +274,12 @@ fn rule_1_one_public_type_per_file() {
 }
 
 // ---------------------------------------------------------------------------
-// Rule 4 — a tests file splits when it passes 400 lines (tripwire at 500)
+// Rule 4 — a file in a tests directory splits when it passes 400 lines (tripwire at 500)
 // ---------------------------------------------------------------------------
 
-const TESTS_FILE_SIZE_BASELINE: &[&str] = &[
-    "crates/dpp-aas/src/tests.rs",
-    "crates/dpp-crypto/src/jades/tests.rs",
-    "crates/dpp-crypto/src/keystore/tests.rs",
-    "crates/dpp-digital-link/src/digital_link/tests.rs",
-    "crates/dpp-registry/src/tests.rs",
-];
+// Empty. The five files that were on it were moved into a `tests` directory and
+// split along their seams when rule 4 began to govern every file there.
+const TESTS_FILE_SIZE_BASELINE: &[&str] = &[];
 
 #[test]
 fn rule_4_tests_files_are_navigable() {
@@ -278,8 +288,9 @@ fn rule_4_tests_files_are_navigable() {
         let mut files = Vec::new();
         find_rs_files(&dir, &mut files);
         for path in files {
-            let name = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
-            if !matches!(name, "tests.rs" | "golden_vectors.rs") && !name.ends_with("_tests.rs") {
+            // Every file in a `tests` directory under `src/`. Crate-level `tests/`
+            // directories are not governed: `governed_src_dirs` does not reach them.
+            if !in_tests_dir(&path) {
                 continue;
             }
             let Some(src) = read_source(&path) else {
@@ -296,7 +307,7 @@ fn rule_4_tests_files_are_navigable() {
     }
     assert_against_baseline(
         &format!(
-            "CODE-LAYOUT.md rule 4 — a tests file splits when it passes \
+            "CODE-LAYOUT.md rule 4 — a file in a tests directory splits when it passes \
              {TESTS_FILE_TARGET_LINES} lines; the build objects past \
              {MAX_TESTS_FILE_LINES}"
         ),
@@ -315,17 +326,14 @@ const ROOT_FILES_BASELINE: &[&str] = &[
     "crates/dpp-aas/src/model.rs",
     "crates/dpp-aas/src/property.rs",
     "crates/dpp-aas/src/templates.rs",
-    "crates/dpp-aas/src/tests.rs",
     "crates/dpp-plugin-sdk/src/abi.rs",
     "crates/dpp-plugin-sdk/src/codec.rs",
     "crates/dpp-plugin-sdk/src/entry.rs",
-    "crates/dpp-plugin-sdk/src/tests.rs",
     "crates/dpp-plugin-sdk/src/validate.rs",
     "crates/dpp-plugin-traits/src/error.rs",
     "crates/dpp-plugin-traits/src/meta.rs",
     "crates/dpp-plugin-traits/src/plugin.rs",
     "crates/dpp-plugin-traits/src/result.rs",
-    "crates/dpp-plugin-traits/src/tests.rs",
     "crates/dpp-plugin-traits/src/version.rs",
     "crates/dpp-registry/src/endpoint.rs",
     "crates/dpp-registry/src/error.rs",
@@ -333,7 +341,6 @@ const ROOT_FILES_BASELINE: &[&str] = &[
     "crates/dpp-registry/src/identifiers.rs",
     "crates/dpp-registry/src/payload.rs",
     "crates/dpp-registry/src/response.rs",
-    "crates/dpp-registry/src/tests.rs",
     "crates/dpp-registry/src/transfer.rs",
     // Rule 9 names this `test_support.rs`; renaming it is a later phase.
     "crates/dpp-tests/src/fixtures.rs",
@@ -376,100 +383,175 @@ fn rule_6_only_lib_rs_at_src_root() {
 }
 
 // ---------------------------------------------------------------------------
-// Rule 7 — tests live in a sibling file, never inline
+// Rule 7 — every test lives in a directory named `tests`
 // ---------------------------------------------------------------------------
 
-const INLINE_TESTS_BASELINE: &[&str] = &[
-    "crates/dpp-calc/src/co2e/calculator.rs",
-    "crates/dpp-calc/src/co2e/cfb.rs",
-    "crates/dpp-calc/src/co2e/gwp_factors.rs",
-    "crates/dpp-calc/src/kernel/assessability.rs",
-    "crates/dpp-calc/src/kernel/clock.rs",
-    "crates/dpp-calc/src/kernel/receipt.rs",
-    "crates/dpp-calc/src/kernel/synthetic_factor.rs",
-    "crates/dpp-calc/src/repairability/calculator.rs",
-    "crates/dpp-crypto/src/jws/canonical.rs",
-    "crates/dpp-digital-link/src/digital_link/codec.rs",
-    "crates/dpp-digital-link/src/digital_link/element_string.rs",
-    "crates/dpp-digital-link/src/digital_link/syntax_dictionary.rs",
-    "crates/dpp-digital-link/src/linktype/media_type.rs",
-    "crates/dpp-digital-link/src/linktype/vocabulary.rs",
-    "crates/dpp-plugin-sdk/src/validate.rs",
-    "crates/dpp-registry/src/granularity.rs",
-    "crates/dpp-rules/src/batteries/chemistry.rs",
-    "crates/dpp-rules/src/batteries/degradation.rs",
-    "crates/dpp-rules/src/batteries/passport_content.rs",
-    "crates/dpp-rules/src/batteries/recycled_content.rs",
-    "crates/dpp-rules/src/chemicals/cas.rs",
-    "crates/dpp-rules/src/chemicals/surfactants.rs",
-    "crates/dpp-rules/src/chemicals/svhc.rs",
-    "crates/dpp-rules/src/common/country.rs",
-    "crates/dpp-rules/src/common/date.rs",
-    "crates/dpp-rules/src/common/numeric.rs",
-    "crates/dpp-rules/src/lint/battery.rs",
-    "crates/dpp-rules/src/lint/textile.rs",
-    "crates/dpp-rules/src/metals/aluminium.rs",
-    "crates/dpp-rules/src/textiles/fibre.rs",
-    "crates/dpp-rules/src/unsold_goods/annex_vii.rs",
-    "crates/dpp-vc/src/local_service.rs",
-    "crates/dpp-vc/src/passport_credential.rs",
-    "crates/dpp-vc/src/status_list.rs",
-    // These plugins keep their tests inline; battery, the reference
-    // implementation, shows the shape to move them to.
-    "plugins/product-group-aluminium/src/lib.rs",
-    "plugins/product-group-construction/src/lib.rs",
-    "plugins/product-group-detergent/src/lib.rs",
-    "plugins/product-group-electronics/src/lib.rs",
-    "plugins/product-group-furniture/src/lib.rs",
-    "plugins/product-group-steel/src/lib.rs",
-    "plugins/product-group-textile/src/lib.rs",
-    "plugins/product-group-toy/src/lib.rs",
-    "plugins/product-group-tyre/src/lib.rs",
-];
+// Empty. Every inline test module and every sibling test file moved into the
+// `tests` directory of its module.
+const INLINE_TESTS_BASELINE: &[&str] = &[];
+
+/// Whether a line of code starts a test the harness will run.
+fn starts_a_test(line: &str) -> bool {
+    line.starts_with("#[test]")
+        || line.starts_with("#[tokio::test")
+        || line.starts_with("proptest!")
+}
+
+/// The module name on a `mod <name> {` or `mod <name>;` line, with which of the
+/// two it is. `None` for any other line.
+fn module_declared(line: &str) -> Option<(&str, bool)> {
+    let rest = line
+        .strip_prefix("pub(crate) mod ")
+        .or_else(|| line.strip_prefix("pub(super) mod "))
+        .or_else(|| line.strip_prefix("pub mod "))
+        .or_else(|| line.strip_prefix("mod "))?;
+    if let Some(name) = rest.strip_suffix('{') {
+        return Some((name.trim(), true));
+    }
+    rest.strip_suffix(';').map(|name| (name.trim(), false))
+}
 
 #[test]
-fn rule_7_tests_are_siblings_not_inline() {
+fn rule_7_tests_live_in_a_tests_directory() {
     let mut found: BTreeMap<String, String> = BTreeMap::new();
     for dir in governed_src_dirs() {
         let mut files = Vec::new();
         find_rs_files(&dir, &mut files);
         for path in files {
+            // A `tests` directory is where the tests are meant to be.
+            if in_tests_dir(&path) {
+                continue;
+            }
             let Some(src) = read_source(&path) else {
                 continue;
             };
             if has_deviation_marker(&src) {
                 continue;
             }
-            // An inline test module is `mod <name> {`; the sibling-file form is
-            // `mod <name>;`, which is what the rule asks for.
-            //
-            // Any test-ish name counts, not just `tests`. An earlier version
-            // matched `mod tests {` alone and so missed five modules named for
-            // their subject — `mod passport_wire_keys_tests {` and friends — one
-            // of which then fooled a measurement into reporting a violation that
-            // was only ever a fixture.
-            let inline = code_lines(&src).iter().any(|l| {
-                let Some(rest) = l
-                    .strip_prefix("mod ")
-                    .or_else(|| l.strip_prefix("pub mod "))
-                else {
-                    return false;
-                };
-                if !rest.ends_with('{') {
-                    return false;
+            let mut reasons: BTreeSet<&str> = BTreeSet::new();
+            for line in code_lines(&src) {
+                if starts_a_test(line) {
+                    reasons.insert("a test outside a tests directory");
                 }
-                let name = rest.trim_end_matches('{').trim();
-                name == "tests" || name.ends_with("_tests")
-            });
-            if inline {
-                found.insert(rel(&path), String::new());
+                // `#[cfg(test)] mod tests;` is the one allowed declaration. What
+                // is refused is a test module of any other name, or one written
+                // out inline, since an inline module has no file of its own.
+                //
+                // Any test-ish name counts, not just `tests`. An earlier version
+                // matched `mod tests {` alone and so missed five modules named for
+                // their subject — `mod passport_wire_keys_tests {` and friends.
+                if let Some((name, inline)) = module_declared(line) {
+                    if inline && (name == "tests" || name.ends_with("_tests")) {
+                        reasons.insert("an inline test module");
+                    }
+                    if !inline && name.ends_with("_tests") {
+                        reasons.insert("a sibling test module");
+                    }
+                }
+            }
+            if !reasons.is_empty() {
+                found.insert(
+                    rel(&path),
+                    reasons.into_iter().collect::<Vec<_>>().join(", "),
+                );
             }
         }
     }
     assert_against_baseline(
-        "CODE-LAYOUT.md rule 7 — tests live in a sibling tests.rs, never inline",
+        "CODE-LAYOUT.md rule 7 — a test lives in a `tests` directory, never beside or inside the source",
         &found,
         INLINE_TESTS_BASELINE,
+    );
+}
+
+// ---------------------------------------------------------------------------
+// Rule 7 — no name inside a tests directory says `test`
+// ---------------------------------------------------------------------------
+
+/// Whether `name` has `test` or `tests` as one of its `_`-separated words.
+fn has_test_word(name: &str) -> bool {
+    name.split('_')
+        .any(|word| word == "test" || word == "tests")
+}
+
+/// Every `tests` directory this standard reaches: those under a `src/`, and each
+/// crate's and plugin's own `tests/`.
+fn tests_dirs() -> Vec<PathBuf> {
+    fn collect(dir: &Path, out: &mut Vec<PathBuf>) {
+        let Ok(entries) = fs::read_dir(dir) else {
+            return;
+        };
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if !path.is_dir() {
+                continue;
+            }
+            if path.file_name().and_then(|n| n.to_str()) == Some("tests") {
+                out.push(path.clone());
+            }
+            collect(&path, out);
+        }
+    }
+
+    let root = workspace_root();
+    let mut dirs = Vec::new();
+    for group in ["crates", "plugins"] {
+        let Ok(entries) = fs::read_dir(root.join(group)) else {
+            continue;
+        };
+        for entry in entries.flatten() {
+            let krate = entry.path();
+            let crate_tests = krate.join("tests");
+            if crate_tests.is_dir() {
+                dirs.push(crate_tests);
+            }
+            collect(&krate.join("src"), &mut dirs);
+        }
+    }
+    dirs
+}
+
+/// The directory `tests` already says what the files in it are, so a name that
+/// says it again is rule 12's fault applied to the test tree. `fixtures/` is the
+/// exception: its files keep the names their upstream gave them, and the
+/// Wycheproof corpora are called `*_test.json`.
+#[test]
+fn rule_7_no_test_word_inside_tests() {
+    fn visit(dir: &Path, found: &mut BTreeMap<String, String>) {
+        let Ok(entries) = fs::read_dir(dir) else {
+            return;
+        };
+        for entry in entries.flatten() {
+            let path = entry.path();
+            let Some(name) = path.file_name().and_then(|n| n.to_str()) else {
+                continue;
+            };
+            if path.is_dir() {
+                if name == "fixtures" {
+                    continue;
+                }
+                if has_test_word(name) {
+                    found.insert(rel(&path), "a directory named for what it is".to_owned());
+                }
+                visit(&path, found);
+            } else if path.extension().and_then(|e| e.to_str()) == Some("rs") {
+                let stem = path.file_stem().and_then(|s| s.to_str()).unwrap_or("");
+                if has_test_word(stem) {
+                    found.insert(rel(&path), "a file named for what it is".to_owned());
+                }
+            }
+        }
+    }
+
+    let mut found: BTreeMap<String, String> = BTreeMap::new();
+    for dir in tests_dirs() {
+        visit(&dir, &mut found);
+    }
+    assert_against_baseline(
+        "CODE-LAYOUT.md rule 7 — no file or directory inside a `tests` directory has \
+         `test` or `tests` as a word in its name",
+        &found,
+        &[],
     );
 }
 
@@ -486,20 +568,14 @@ const MODULE_DOCS_BASELINE: &[&str] = &[
     "crates/dpp-aas/src/property.rs",
     "crates/dpp-aas/src/semantic_ids/mod.rs",
     "crates/dpp-aas/src/templates.rs",
-    "crates/dpp-aas/src/tests.rs",
-    "crates/dpp-crypto/src/jws/tests.rs",
     "crates/dpp-crypto/src/keystore/migration.rs",
     "crates/dpp-crypto/src/keystore/rotation.rs",
-    "crates/dpp-crypto/src/keystore/tests.rs",
     "crates/dpp-rules/src/canonical/hash.rs",
-    "crates/dpp-rules/src/canonical/tests.rs",
     "crates/dpp-vc/src/credential/builder.rs",
     "crates/dpp-vc/src/credential/revocation.rs",
-    "crates/dpp-vc/src/credential/tests.rs",
     "crates/dpp-vc/src/credential/trust.rs",
     "crates/dpp-vc/src/credential/types.rs",
     "crates/dpp-vc/src/credential/verify.rs",
-    "crates/dpp-vocab/src/register/tests.rs",
 ];
 
 #[test]
@@ -588,11 +664,7 @@ fn tier_of(module: &str) -> Option<u8> {
 /// Test files may reach anywhere: a test exercises the thing it covers from
 /// outside, and the ladder is a statement about production dependencies.
 fn is_test_file(path: &Path) -> bool {
-    let name = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
-    name == "tests.rs"
-        || name == "golden_vectors.rs"
-        || name.ends_with("_tests.rs")
-        || path.components().any(|c| c.as_os_str() == "tests")
+    path.components().any(|c| c.as_os_str() == "tests")
 }
 
 #[test]
@@ -612,7 +684,9 @@ fn rule_0_tier_imports_point_up() {
                 continue;
             }
             let name = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
-            if tier_of(name).is_none() {
+            // `tests` is where the module's tests live (rule 7), not a module with a
+            // tier of its own.
+            if name != "tests" && tier_of(name).is_none() {
                 unlisted.push(name.to_owned());
             }
         }
@@ -728,12 +802,6 @@ fn rule_11_an_outgrown_concept_is_a_directory() {
             for (stem, path) in &stems {
                 for (other, _) in &stems {
                     if other == stem || !other.starts_with(&format!("{stem}_")) {
-                        continue;
-                    }
-                    // Any `*_tests.rs` beside it is the sibling-test file
-                    // rules 4 and 7 require. Flagging it would make two rules
-                    // contradict each other, and the one that fires first wins.
-                    if other.ends_with("_tests") {
                         continue;
                     }
                     let Some(src) = read_source(path) else {
