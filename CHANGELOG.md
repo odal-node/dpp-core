@@ -210,9 +210,10 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   `NotYetValid { valid_from }`, where it was `MalformedCredential`. Neither variant is
   valid, so `is_valid()` is false and a caller refuses both as it refuses `Revoked` and
   `Expired`; the fail-closed policy is unchanged. **Migration:** a `match` on
-  `VerificationResult` needs an arm for each new variant. A caller that tested for `Revoked` to catch an
-  unavailable status list also tests for `RevocationIndeterminate`, and a caller that
-  matched `MalformedCredential` for a future `validFrom` matches `NotYetValid` instead.
+  `VerificationResult` needs an arm for each new variant. A caller that tested for
+  `Revoked` to catch an unavailable status list also tests for `RevocationIndeterminate`,
+  and a caller that matched `MalformedCredential` for a future `validFrom` matches
+  `NotYetValid` instead. (#699)
 
 ### Added
 
