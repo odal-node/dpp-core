@@ -32,7 +32,8 @@ fn parse(s: &str) -> Result<Status, Error> {
 }
 pub trait ArchivedVersionPort {}
 EOF
-    cat > "$root/crates/dom/src/status/tests.rs" <<'EOF'
+    mkdir -p "$root/crates/dom/src/status/tests"
+    cat > "$root/crates/dom/src/status/tests/status.rs" <<'EOF'
 fn old_status_is_refused() { parse("archived").unwrap_err(); }
 EOF
     cat > "$root/crates/key/src/rotation.rs" <<'EOF'
@@ -80,7 +81,7 @@ run_case "a_schema_value_archived_is_refused" reject \
 run_case "the_refusal_removed_is_refused" reject \
     'grep -v "=> Err(Error::custom" "$lib" > t && mv t "$lib"'
 run_case "the_word_in_a_test_file_is_accepted" accept \
-    'printf "%s\n" "fn t() { let _ = \"archive\"; }" >> crates/dom/src/status/tests.rs'
+    'printf "%s\n" "fn t() { let _ = \"archive\"; }" >> crates/dom/src/status/tests/status.rs'
 run_case "the_word_in_an_inline_test_module_is_accepted" accept \
     'printf "%s\n" "#[cfg(test)]" "mod tests { fn t() { let _ = parse(\"archived\"); } }" >> "$lib"'
 run_case "the_word_in_a_message_is_accepted" accept \

@@ -2,6 +2,6 @@
 
 mod info;
 #[cfg(test)]
-mod info_tests;
+mod tests;
 
 pub use info::ManufacturerInfo;

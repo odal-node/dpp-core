@@ -11,16 +11,14 @@ pub mod detergent;
 pub mod electronics;
 pub mod furniture;
 pub mod mattress;
-#[cfg(test)]
-mod other_constructor_tests;
 pub mod product_group_data;
 pub mod steel;
+#[cfg(test)]
+mod tests;
 pub mod textile;
 pub mod toy;
 pub mod tyre;
 pub mod unmodelled;
-#[cfg(test)]
-mod unmodelled_tests;
 
 pub use aluminium::AluminiumData;
 pub use battery::{

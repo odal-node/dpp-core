@@ -3,7 +3,7 @@
  * RFC 9901.
  *
  * `corpus.json` comes from
- * `EMIT_SDJWT_CORPUS=1 cargo test -p dpp-crypto --lib sd_jwt::oracle_tests::emit`.
+ * `EMIT_SDJWT_CORPUS=1 cargo test -p dpp-crypto --lib sd_jwt::tests::oracle::emit`.
  * Four groups, four questions:
  *
  *   issued, presented  Tokens this crate built from a claim tree, with the claims a

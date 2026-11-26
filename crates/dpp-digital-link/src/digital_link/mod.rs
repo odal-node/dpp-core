@@ -57,8 +57,6 @@ mod syntax_dictionary;
 #[cfg(test)]
 mod tests;
 mod value;
-#[cfg(test)]
-mod value_tests;
 
 pub use component::{CharKind, Component};
 pub use element_string::ElementString;

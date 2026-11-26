@@ -11,8 +11,6 @@ mod finding;
 mod result;
 mod status;
 #[cfg(test)]
-mod status_all_tests;
-#[cfg(test)]
 mod tests;
 
 pub use error::{ComplianceError, ComplianceErrorKind};

@@ -76,13 +76,17 @@ fn test_gated_files(src_dir: &Path) -> BTreeSet<PathBuf> {
             .file_name()
             .and_then(|n| n.to_str())
             .unwrap_or_default();
-        if name != "mod.rs" && name != "lib.rs" {
-            continue;
-        }
         let Ok(src) = fs::read_to_string(&path) else {
             continue;
         };
-        let dir = path.parent().unwrap_or(src_dir);
+        // A module's children sit beside its `mod.rs`, `lib.rs` or `main.rs`, and
+        // under a directory of its own name beside any other file.
+        let parent = path.parent().unwrap_or(src_dir);
+        let dir = if matches!(name, "mod.rs" | "lib.rs" | "main.rs") {
+            parent.to_path_buf()
+        } else {
+            parent.join(name.trim_end_matches(".rs"))
+        };
         let lines: Vec<&str> = src.lines().map(str::trim).collect();
         for (i, line) in lines.iter().enumerate() {
             if *line != "#[cfg(test)]" {
@@ -97,6 +101,11 @@ fn test_gated_files(src_dir: &Path) -> BTreeSet<PathBuf> {
             let module = module.trim();
             gated.insert(dir.join(format!("{module}.rs")));
             gated.insert(dir.join(module).join("mod.rs"));
+            // Everything under a gated module is gated with it, so a `tests`
+            // module's own files are as well as its index.
+            let mut children = Vec::new();
+            find_rs_files(&dir.join(module), &mut children);
+            gated.extend(children);
         }
     }
     gated

@@ -14,7 +14,7 @@ mod types;
 pub mod battery;
 pub mod svhc;
 #[cfg(test)]
-mod svhc_tests;
+mod tests;
 pub mod textile;
 pub mod unsold_goods;
 

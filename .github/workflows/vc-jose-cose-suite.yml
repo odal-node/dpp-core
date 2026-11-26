@@ -50,7 +50,7 @@ env:
   # change into a red build here on code that did not change. Dependabot does not
   # watch this line. The run names the suite here and nowhere else. The inputs
   # vendored for `dpp-vc`'s own tests name the same commit
-  # (`crates/dpp-vc/src/jose/fixtures_tests.rs`), and are moved with it.
+  # (`crates/dpp-vc/src/jose/tests/fixtures.rs`), and are moved with it.
   SUITE_COMMIT: cf4c93ddf7e1bfef5a3e5db4b9a798b02ea778a9
 
 jobs:

@@ -99,7 +99,7 @@ jobs:
           node -p "'jose ' + require('./.github/oracle/jose/node_modules/jose/package.json').version"
 
       - name: Build the corpus from our own issuer
-        run: EMIT_JOSE_CORPUS=1 cargo test -p dpp-vc --lib jose::oracle_tests::emit
+        run: EMIT_JOSE_CORPUS=1 cargo test -p dpp-vc --lib jose::tests::oracle::emit
 
       - name: Judge the corpus
         run: node .github/oracle/jose/judge.mjs
@@ -108,7 +108,7 @@ jobs:
         run: node .github/oracle/jose/issue.mjs
 
       - name: Verify what it signed
-        run: CHECK_JOSE_ORACLE_ISSUED=target/jose-oracle/issued.json cargo test -p dpp-vc --lib jose::oracle_tests::reverse -- --nocapture
+        run: CHECK_JOSE_ORACLE_ISSUED=target/jose-oracle/issued.json cargo test -p dpp-vc --lib jose::tests::oracle::reverse -- --nocapture
 
       # Our own signatures are RFC 6979 deterministic, so the corpus must be byte for
       # byte the same. The library's are not: Ed25519 is, and ECDSA draws a fresh
@@ -120,7 +120,7 @@ jobs:
         run: |
           sha256sum target/jose-oracle/corpus.json > target/jose-oracle/first.sha256
           cp target/jose-oracle/issued.json target/jose-oracle/issued-first.json
-          EMIT_JOSE_CORPUS=1 cargo test -p dpp-vc --lib jose::oracle_tests::emit
+          EMIT_JOSE_CORPUS=1 cargo test -p dpp-vc --lib jose::tests::oracle::emit
           sha256sum --check target/jose-oracle/first.sha256
           node .github/oracle/jose/issue.mjs target/jose-oracle/issued-again.json
           node .github/oracle/jose/same.mjs target/jose-oracle/issued-first.json target/jose-oracle/issued-again.json

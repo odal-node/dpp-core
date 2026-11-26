@@ -1,8 +1,11 @@
 //! Rows 17 to 26: the SD-JWT features.
 
-use super::*;
+use super::common::*;
+use crate::feature::Feature;
 use crate::paths::parse_sd;
+use crate::run::{Verdict, issue, verify};
 use dpp_crypto::sd_jwt::{Disclosure, SdJwt};
+use serde_json::Value;
 
 const P521: &str = fixture!("vm-p521.json");
 

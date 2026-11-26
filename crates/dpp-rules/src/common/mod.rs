@@ -5,7 +5,7 @@
 pub mod country;
 pub mod date;
 pub mod identifier;
-#[cfg(test)]
-mod identifier_tests;
 pub mod numeric;
+#[cfg(test)]
+mod tests;
 pub mod units;

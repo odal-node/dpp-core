@@ -3,7 +3,7 @@
  * independent implementation of RFC 9901.
  *
  * `vc-sd-jwt.json` comes from
- * `EMIT_VC_SD_JWT_CORPUS=1 cargo test -p dpp-vc --lib jose::sd_jwt_oracle_tests`.
+ * `EMIT_VC_SD_JWT_CORPUS=1 cargo test -p dpp-vc --lib jose::tests::sd_jwt::oracle`.
  * Each case is a W3C Verifiable Credential or Presentation secured as an SD-JWT
  * (VC-JOSE-COSE section 3.2), as issued or as presented in part. The cases include
  * the three issuance inputs of the W3C VC-JOSE-COSE test suite (rows 17 to 19),

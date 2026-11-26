@@ -28,15 +28,12 @@
 //! names them identically is unverified.
 
 mod batch;
-#[cfg(test)]
-mod batch_tests;
 mod error_codes;
 mod limits;
 mod outcome;
 mod passport_outcome;
 mod passport_result;
 mod receipt;
-
 #[cfg(test)]
 mod tests;
 

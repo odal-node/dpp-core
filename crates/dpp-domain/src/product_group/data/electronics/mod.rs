@@ -2,14 +2,12 @@
 
 mod data;
 mod device_type;
-#[cfg(test)]
-mod device_type_tests;
 mod efficiency_class;
 mod index_scope_exclusion;
 mod priority_part_scores;
 mod repairability_index;
 #[cfg(test)]
-mod repairability_index_tests;
+mod tests;
 
 pub use data::ElectronicsData;
 pub use device_type::DeviceType;

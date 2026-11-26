@@ -14,8 +14,6 @@ mod acknowledgement;
 mod confirmation;
 mod granularity;
 mod lookup;
-#[cfg(test)]
-mod outcome_tests;
 mod port;
 mod record;
 mod registering_operator;

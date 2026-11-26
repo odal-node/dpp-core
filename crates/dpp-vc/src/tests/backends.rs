@@ -13,7 +13,7 @@ use dpp_crypto::keystore::{KeyBackend, MemoryKeyStore};
 use dpp_domain::PassportId;
 use dpp_domain::ports::identity::IdentityPort;
 
-use super::rotation::{kid_named, verifies_in, without_waiting};
+use super::common::{kid_named, verifies_in, without_waiting};
 use crate::did_builder::{build_did_document, did_for};
 use crate::local_service::LocalIdentityService;
 use crate::sd_jwt_vc::build_issuer_metadata;

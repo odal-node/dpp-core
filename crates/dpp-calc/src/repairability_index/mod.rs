@@ -34,7 +34,7 @@ pub mod parameters;
 pub mod thresholds;
 
 #[cfg(test)]
-mod golden_vectors;
+mod tests;
 
 pub use calculator::{RepairabilityClass, RepairabilityIndexResult, calculate};
 pub use parameters::{PriorityPartScores, RepairabilityIndexInputs};

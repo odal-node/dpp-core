@@ -21,6 +21,4 @@ pub use registry::PassthroughRegistry;
 pub use strategies::{PassthroughBatteryStrategy, PassthroughTextileStrategy};
 
 #[cfg(test)]
-mod registry_tests;
-#[cfg(test)]
-mod strategies_tests;
+mod tests;

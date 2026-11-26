@@ -22,14 +22,6 @@ pub mod record;
 pub mod status;
 
 #[cfg(test)]
-mod chain_outcome_tests;
-#[cfg(test)]
-mod chain_read_tests;
-#[cfg(test)]
-mod chain_tests;
-#[cfg(test)]
-mod reason_all_tests;
-#[cfg(test)]
 mod tests;
 
 pub use chain::TransferChain;

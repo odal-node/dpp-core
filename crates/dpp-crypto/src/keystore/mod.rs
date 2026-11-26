@@ -37,32 +37,16 @@
 //! [`KeyStore`] for why the lock is on a sibling file, and for what it does not stop.
 
 mod backend;
-#[cfg(test)]
-mod backend_tests;
 mod crypto;
 mod entry;
 mod error;
 mod lock;
-#[cfg(test)]
-mod lock_tests;
 #[cfg(any(test, feature = "test-utils"))]
 mod memory;
-#[cfg(test)]
-mod memory_tests;
 mod migration;
-#[cfg(test)]
-mod persist_tests;
 mod private_jwk;
-#[cfg(test)]
-mod private_jwk_refusal_tests;
-#[cfg(test)]
-mod private_jwk_tests;
-#[cfg(test)]
-mod rfc9106_vector_tests;
 mod rotation;
 mod signer;
-#[cfg(test)]
-mod signer_tests;
 mod store;
 #[cfg(test)]
 mod tests;

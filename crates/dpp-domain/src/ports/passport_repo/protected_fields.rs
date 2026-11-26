@@ -82,7 +82,7 @@ pub const PROTECTED_PATCH_FIELDS: &[&str] = &[
     // envelope fields through. None was ever reachable via `PUT /dpp/{id}` on
     // the only consumer that ships — it builds its delta from an allow-list —
     // but that guard lives in a consumer, and this list is the contract every
-    // other implementor inherits. See `protected_fields_tests`, which now makes
+    // other implementor inherits. See `tests/protected_fields.rs`, which now makes
     // an unclassified wire key a compile-time-adjacent failure rather than a
     // silent permission.
     //

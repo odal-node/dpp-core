@@ -2,6 +2,7 @@
 
 mod algorithms;
 mod backends;
+mod common;
 mod did_document;
 mod local_service;
 mod rotation;

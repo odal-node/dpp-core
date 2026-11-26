@@ -1,6 +1,9 @@
 //! Rows 27 to 35: the COSE features.
 
-use super::*;
+use super::common::*;
+use crate::feature::Feature;
+use crate::run::{Verdict, issue, verify};
+use serde_json::Value;
 
 fn verdict(feature: Feature, token: &str, key: &str) -> Verdict {
     verify(feature, token, key).expect("a verdict")

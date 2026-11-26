@@ -1,7 +1,7 @@
 //! Shared `#[cfg(test)]`-only fixtures for this crate's test suites.
 //!
 //! The VC-JOSE-COSE fixtures are the input files of the W3C VC-JOSE-COSE test suite,
-//! carried verbatim: see `jose::fixtures_tests` for where they come from and the pin on
+//! carried verbatim: see `jose::tests::fixtures` for where they come from and the pin on
 //! each. Each is embedded here once, so no test reads from the file system. The rest
 //! builds a credential and a presentation under a key the test generated, and forges
 //! tokens with a genuine signature over a header or payload that `sign_credential`

@@ -29,17 +29,7 @@
 
 mod builder;
 pub mod jwt;
-#[cfg(test)]
-mod jwt_algorithm_tests;
-#[cfg(test)]
-mod jwt_reason_tests;
-#[cfg(test)]
-mod jwt_tests;
 mod revocation;
-#[cfg(test)]
-mod revocation_result_tests;
-#[cfg(test)]
-mod revocation_tests;
 #[cfg(test)]
 mod tests;
 mod trust;

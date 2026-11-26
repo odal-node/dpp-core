@@ -3,38 +3,12 @@
 
 pub mod algorithm;
 pub mod canonical;
-#[cfg(test)]
-mod crit_tests;
 mod error;
-#[cfg(test)]
-mod es256_tests;
-#[cfg(test)]
-mod es256_vector_tests;
-#[cfg(test)]
-mod es384_es512_tests;
-#[cfg(test)]
-mod es384_es512_vector_tests;
 mod header_refusal;
-#[cfg(test)]
-mod header_refusal_tests;
-#[cfg(test)]
-mod proptests;
 pub mod public_key;
-#[cfg(test)]
-mod resolve_tests;
-#[cfg(test)]
-mod rfc8032_vector_tests;
-#[cfg(test)]
-mod rfc8037_vector_tests;
-#[cfg(test)]
-mod rfc8785_vector_tests;
-#[cfg(test)]
-mod sign_typed_with_tests;
 pub mod signer;
 #[cfg(test)]
 mod tests;
-#[cfg(test)]
-mod thumbprint_tests;
 pub mod verifier;
 
 pub use algorithm::{

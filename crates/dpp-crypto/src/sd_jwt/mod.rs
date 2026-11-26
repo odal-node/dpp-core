@@ -112,38 +112,6 @@ mod key_binding;
 mod select;
 
 #[cfg(test)]
-mod array_tests;
-#[cfg(test)]
-mod decoy_count_tests;
-#[cfg(test)]
-mod decoy_tests;
-#[cfg(test)]
-mod holder_key_tests;
-#[cfg(test)]
-mod holder_tests;
-#[cfg(test)]
-mod key_binding_tests;
-#[cfg(test)]
-mod oracle_tests;
-#[cfg(test)]
-mod rfc9901_array_tests;
-#[cfg(test)]
-mod rfc9901_es256_tests;
-#[cfg(test)]
-mod rfc9901_example_tests;
-#[cfg(test)]
-mod rfc9901_examples;
-#[cfg(test)]
-mod rfc9901_vector_tests;
-#[cfg(test)]
-mod salt_tests;
-#[cfg(test)]
-mod select_model_tests;
-#[cfg(test)]
-mod select_position_tests;
-#[cfg(test)]
-mod select_tests;
-#[cfg(test)]
 mod tests;
 
 pub use builder::{SdJwt, build_payload, conceal, conceal_elements, conceal_to};

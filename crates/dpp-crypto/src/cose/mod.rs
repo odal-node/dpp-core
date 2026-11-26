@@ -28,23 +28,9 @@ mod header;
 mod sign1;
 
 #[cfg(test)]
-mod cwt_tests;
-#[cfg(test)]
-mod fixtures_tests;
-#[cfg(test)]
-mod header_rule_tests;
-#[cfg(test)]
-mod message_rule_tests;
-#[cfg(test)]
-mod proptests;
-#[cfg(test)]
-mod rfc9052_vector_tests;
-#[cfg(test)]
-mod round_trip_tests;
-#[cfg(test)]
-mod suite_tests;
-#[cfg(test)]
 mod test_support;
+#[cfg(test)]
+mod tests;
 
 pub use algorithm::{accepts_cose_alg, cose_alg};
 pub use cwt::CwtClaims;

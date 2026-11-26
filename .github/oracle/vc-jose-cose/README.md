@@ -94,7 +94,7 @@ stderr. The process then exits 0: a refusal is the right answer to a row that ex
   an envelope, would be refused for their age and pass for the wrong reason. The suite
   states no verification time. Held to the clock, the library refuses row 7 from its
   `exp` on (`row_7_is_refused_from_its_exp_on` in
-  `crates/dpp-vc/src/jose/suite_tests.rs`), so a report of this run says the run had no
+  `crates/dpp-vc/src/jose/tests/suite/verification.rs`), so a report of this run says the run had no
   clock.
 
 An input the harness cannot use, such as a key file that is not a key or a missing file,

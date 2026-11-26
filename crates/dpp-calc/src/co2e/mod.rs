@@ -10,7 +10,7 @@
 //! - [`parameters`] — typed inputs ([`Co2eInputs`], [`MaterialFootprint`]).
 //! - [`thresholds`] — the [`Co2eRuleset`] trait and [`CradleToGateRuleset`] impl.
 //! - [`calculator`] — the [`calculate`] algorithm and its output types.
-//! - `golden_vectors` — `#[cfg(test)]` regression tests.
+//! - `tests/vectors.rs` — `#[cfg(test)]` regression tests.
 //! - [`cfb`] — battery CFB stub; [`gwp_factors`] — embeddable GWP100 table.
 
 pub mod calculator;
@@ -20,7 +20,7 @@ pub mod parameters;
 pub mod thresholds;
 
 #[cfg(test)]
-mod golden_vectors;
+mod tests;
 
 pub use calculator::{Co2eResult, LifecycleStage, MaterialLineResult, calculate};
 pub use parameters::{Co2eInputs, MaterialFootprint};

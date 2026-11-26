@@ -16,11 +16,7 @@ pub mod responsible;
 pub mod snapshot;
 
 #[cfg(test)]
-mod basis_tests;
-#[cfg(test)]
-mod responsible_tests;
-#[cfg(test)]
-mod snapshot_tests;
+mod tests;
 
 pub use basis::ResponsibilityBasis;
 pub use responsible::{OperatorRole, ResponsibleOperator};

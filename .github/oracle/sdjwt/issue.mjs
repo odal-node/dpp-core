@@ -12,7 +12,7 @@
  *
  * For every token the library verifies it first, and what it says the claims are is
  * the `expected` value. This crate has to arrive at the same claims
- * (`sd_jwt::oracle_tests::reverse`, run with `CHECK_SDJWT_ORACLE_ISSUED`). If the
+ * (`sd_jwt::tests::oracle::reverse`, run with `CHECK_SDJWT_ORACLE_ISSUED`). If the
  * library cannot read its own token, that is reported here and the run fails,
  * because a case nobody judged would otherwise just be missing.
  *

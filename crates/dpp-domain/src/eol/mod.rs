@@ -10,8 +10,6 @@
 //! reach needs none. See [`EolEvent::missing_derogation`].
 
 mod deactivation_reason;
-#[cfg(test)]
-mod deactivation_reason_kinds_tests;
 mod derogation;
 mod event;
 #[cfg(test)]

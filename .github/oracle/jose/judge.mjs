@@ -3,7 +3,7 @@
  * JOSE library.
  *
  * `corpus.json` comes from
- * `EMIT_JOSE_CORPUS=1 cargo test -p dpp-vc --lib jose::oracle_tests::emit`. It holds
+ * `EMIT_JOSE_CORPUS=1 cargo test -p dpp-vc --lib jose::tests::oracle::emit`. It holds
  * the W3C VC-JOSE-COSE suite's issuance inputs, rows 1 to 5, and credentials and
  * presentations under EdDSA, ES256, ES384 and ES512, all signed with the suite's own
  * keys, and the JWK published for each `kid`. For every token the library has to

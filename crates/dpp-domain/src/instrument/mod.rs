@@ -8,21 +8,13 @@
 //! nine files share a directory and a reader share two subjects.
 
 pub mod act;
-#[cfg(test)]
-mod axis_tests;
 pub mod binding;
 pub mod catalog;
 pub mod currency;
 pub mod customer_personal_data;
-#[cfg(test)]
-mod customer_personal_data_tests;
 pub mod kind;
-#[cfg(test)]
-mod kind_tests;
 pub mod obligation;
 pub mod reference;
-#[cfg(test)]
-mod reference_tests;
 pub mod status;
 #[cfg(test)]
 mod tests;

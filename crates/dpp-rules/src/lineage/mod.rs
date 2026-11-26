@@ -21,9 +21,7 @@ pub mod status_defect;
 pub mod substantiation;
 
 #[cfg(test)]
-mod consistency_tests;
-#[cfg(test)]
-mod substantiation_tests;
+mod tests;
 
 pub use basis::SubstantiationBasis;
 pub use consistency::check_life_status_consistency;

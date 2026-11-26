@@ -36,9 +36,7 @@ pub mod rules;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod validator;
 
-#[cfg(all(test, not(target_arch = "wasm32")))]
-mod personal_data_tests;
-#[cfg(all(test, not(target_arch = "wasm32")))]
+#[cfg(test)]
 mod tests;
 
 #[cfg(not(target_arch = "wasm32"))]

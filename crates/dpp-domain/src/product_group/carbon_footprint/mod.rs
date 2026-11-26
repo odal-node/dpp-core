@@ -6,12 +6,12 @@
 //! are one concept, and a reader who finds one wants the others.
 
 mod class;
-#[cfg(test)]
-mod class_tests;
 mod error;
 mod footprint;
 mod lifecycle_stage;
 mod system_boundary;
+#[cfg(test)]
+mod tests;
 
 pub use class::CarbonFootprintClass;
 pub use error::CarbonFootprintClassError;

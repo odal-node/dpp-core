@@ -111,7 +111,7 @@ jobs:
 
       - name: Build the corpus from our own issuer
         id: corpus
-        run: EMIT_SDJWT_CORPUS=1 cargo test -p dpp-crypto --lib sd_jwt::oracle_tests::emit
+        run: EMIT_SDJWT_CORPUS=1 cargo test -p dpp-crypto --lib sd_jwt::tests::oracle::emit
 
       - name: Judge the corpus
         run: node .github/oracle/sdjwt/judge.mjs
@@ -125,7 +125,7 @@ jobs:
 
       - name: Build the VC-JOSE-COSE SD-JWTs
         id: vc-sd-jwt-corpus
-        run: EMIT_VC_SD_JWT_CORPUS=1 cargo test -p dpp-vc --lib jose::sd_jwt_oracle_tests
+        run: EMIT_VC_SD_JWT_CORPUS=1 cargo test -p dpp-vc --lib jose::tests::sd_jwt::oracle
 
       - name: Judge the VC-JOSE-COSE SD-JWTs
         run: node .github/oracle/sdjwt/vc-sd-jwt.mjs
@@ -134,7 +134,7 @@ jobs:
         run: node .github/oracle/sdjwt/issue.mjs
 
       - name: Read what it issued
-        run: CHECK_SDJWT_ORACLE_ISSUED=target/sdjwt-oracle/issued.json cargo test -p dpp-crypto --lib sd_jwt::oracle_tests::reverse
+        run: CHECK_SDJWT_ORACLE_ISSUED=target/sdjwt-oracle/issued.json cargo test -p dpp-crypto --lib sd_jwt::tests::oracle::reverse
 
       - name: Verify the credentials it issued
         run: CHECK_SDJWT_VC_ORACLE_ISSUED=target/sdjwt-oracle/issued-vc.json cargo test -p dpp-tests --test sdjwt_vc_oracle_corpus what_an_independent
@@ -211,7 +211,7 @@ jobs:
 
       - name: Read what it issued
         if: ${{ !cancelled() && steps.kt-issue.outcome == 'success' }}
-        run: CHECK_SDJWT_ORACLE_ISSUED=target/sdjwt-oracle/issued-kotlin.json cargo test -p dpp-crypto --lib sd_jwt::oracle_tests::reverse
+        run: CHECK_SDJWT_ORACLE_ISSUED=target/sdjwt-oracle/issued-kotlin.json cargo test -p dpp-crypto --lib sd_jwt::tests::oracle::reverse
 
       - name: Verify the credentials it issued
         if: ${{ !cancelled() && steps.kt-issue.outcome == 'success' }}

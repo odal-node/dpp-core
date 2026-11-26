@@ -55,7 +55,7 @@
 //!    - `mod.rs`        — `pub fn calculate(inputs, ruleset) -> Result<...>` + output types
 //!    - `parameters.rs` — typed input struct (derives `Serialize` for receipt hashing)
 //!    - `thresholds.rs` — `pub trait {Methodology}Ruleset: Ruleset { ... }` + concrete impls
-//!    - `golden_vectors.rs` — `#[cfg(test)]` regression tests
+//!    - `tests/vectors.rs` — `#[cfg(test)]` regression tests
 //! 2. Every `impl RepairabilityRuleset / Co2eRuleset / CfbRuleset` must also
 //!    `impl Ruleset` and fill `regulatory_basis()` with the EU citation.
 //! 3. Add a `resolve_{methodology}()` function to `ruleset_registry/resolve.rs`
