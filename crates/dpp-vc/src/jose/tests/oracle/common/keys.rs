@@ -12,7 +12,7 @@ use dpp_crypto::jws::PublicKey;
 use dpp_crypto::keystore::KeyEntry;
 
 /// Each algorithm, with the suite file that holds its key.
-pub(super) const ALGORITHMS: [(&str, &str); 4] = [
+pub(crate) const ALGORITHMS: [(&str, &str); 4] = [
     ("EdDSA", "ed25519"),
     ("ES256", "p256"),
     ("ES384", "p384"),
@@ -20,7 +20,7 @@ pub(super) const ALGORITHMS: [(&str, &str); 4] = [
 ];
 
 /// The file of the key that signs under `alg`.
-pub(super) fn file_of(alg: &str) -> &'static str {
+pub(crate) fn file_of(alg: &str) -> &'static str {
     ALGORITHMS
         .iter()
         .find(|(name, _)| *name == alg)
@@ -28,24 +28,24 @@ pub(super) fn file_of(alg: &str) -> &'static str {
         .1
 }
 
-pub(super) fn signing(alg: &str) -> KeyEntry {
+pub(crate) fn signing(alg: &str) -> KeyEntry {
     signing_key(file_of(alg))
 }
 
-pub(super) fn public(alg: &str) -> PublicKey {
+pub(crate) fn public(alg: &str) -> PublicKey {
     public_key(file_of(alg))
 }
 
 /// The `kid` this crate signs under: the absolute URL of the key's verification
 /// method, which §4.2 asks for when a credential has no `iss`.
-pub(super) fn kid(alg: &str) -> String {
+pub(crate) fn kid(alg: &str) -> String {
     key_id(file_of(alg))
 }
 
 /// Every `kid` a token in the corpus can carry, with the JWK it names. The suite's
 /// own tokens name a key by the thumbprint in its JWK's `kid`, and this crate's by
 /// the URL of its verification method, so each key is listed under both.
-pub(super) fn published() -> Map<String, Value> {
+pub(crate) fn published() -> Map<String, Value> {
     let mut map = Map::new();
     for (_, file) in ALGORITHMS {
         let key = key_file(file);

@@ -16,16 +16,7 @@ use sha2::{Digest, Sha512};
 
 use crate::sd_jwt::digest_of;
 
-use super::base::*;
-use super::plan::{Path, issue_to_plan, path};
-use super::signing::{Issuer, assemble};
-
-pub(super) struct Adversarial {
-    pub(super) id: String,
-    /// The clause of RFC 9901 the case turns on, or why it is an edge.
-    pub(super) clause: &'static str,
-    pub(super) token: String,
-}
+use super::common::*;
 
 pub(super) fn cases(issuer: &Issuer) -> Vec<Adversarial> {
     let base = Base::new(issuer);

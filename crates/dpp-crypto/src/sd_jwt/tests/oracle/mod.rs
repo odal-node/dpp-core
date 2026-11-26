@@ -8,8 +8,10 @@
 //! no code and no author in common with this one is the only check that is not
 //! circular, so this module produces tokens for one and reads tokens from one.
 //!
-//! - [`plan`] issues a claim tree to a plan, and works out independently what a
-//!   verifier must see when only some of it is presented.
+//! - [`common`] holds what the rest share: the plan a claim tree is issued to, with
+//!   an independent working-out of what a verifier must see when only some of it is
+//!   presented, the issuer key and the verdicts, and the small credential the
+//!   adversarial cases mutate.
 //! - [`issued`] is the corpus of tokens this crate issues.
 //! - [`adversarial`] is the corpus of tokens it should refuse, each with the
 //!   verdict this crate gives, so the two implementations can be compared.
@@ -24,11 +26,9 @@
 //! `just check` gets that coverage without producing files.
 
 mod adversarial;
-mod base;
 mod bound;
+mod common;
 mod emit;
 mod issued;
-mod plan;
 mod reverse;
 mod rfc;
-mod signing;

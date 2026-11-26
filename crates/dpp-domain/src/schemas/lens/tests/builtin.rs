@@ -3,7 +3,7 @@
 use serde_json::Value;
 
 use super::super::*;
-use super::registry::{battery_v1, v};
+use super::common::{battery_v1, v};
 use crate::schemas::VersionedSchemaRegistry;
 
 #[test]

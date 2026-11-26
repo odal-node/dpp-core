@@ -3,7 +3,7 @@
 //!
 //! The envelopes here are of a media type this crate does not read, so only the shape
 //! is under test. The shape rules that were there before (`@context` absent, `id` not a
-//! `data:` URL, and the rest) are in `presentation_tests`.
+//! `data:` URL, and the rest) are in `presentation.rs`.
 
 use serde_json::{Value, json};
 

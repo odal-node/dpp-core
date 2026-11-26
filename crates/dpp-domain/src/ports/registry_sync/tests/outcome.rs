@@ -1,11 +1,11 @@
 //! What the registry's answers look like as types: a transfer notification's
 //! [`TransferReport`] and a lookup's [`SubmissionLookup`].
 //!
-//! The request builder and the granularity mapping are in `tests`, whose
-//! fixtures these share.
+//! The request builder and the granularity mapping are in `request.rs`; the fixtures these
+//! share are in `common.rs`.
 
 use super::super::*;
-use super::request::{acme, make_published_passport};
+use super::common::{acme, make_published_passport};
 
 /// Only a settled notification stops being sent. `Processing` and an
 /// unrecognised state both end in a resend, so a caller that closed on either

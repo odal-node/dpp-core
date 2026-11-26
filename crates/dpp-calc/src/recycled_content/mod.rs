@@ -42,7 +42,7 @@
 //! - [`parameters`] — [`RecycledContentInputs`], the four declared shares.
 //! - [`thresholds`] — [`RecycledContentRuleset`] + the two phase rulesets.
 //! - [`calculator`] — [`calculate`], [`RecycledContentResult`], [`MetalShortfall`].
-//! - `golden_vectors` — `#[cfg(test)]` regression tests.
+//! - `tests/vectors.rs` — `#[cfg(test)]` regression tests.
 
 pub mod calculator;
 pub mod parameters;

@@ -8,8 +8,8 @@ use serde_json::{Value, json};
 use super::super::super::{
     ClaimPath, Disclosure, SdJwt, SdJwtError, build_payload, conceal, conceal_elements,
 };
-use super::super::disclosure::stub_jwt;
-use super::super::select::path::{chosen, digest_named, fixture, object, set};
+use super::super::common::stub_jwt;
+use super::common::{chosen, digest_named, fixture, object, set};
 
 // --- where an array element is ------------------------------------------------
 

@@ -2,7 +2,7 @@
 //! Holder cannot leave it out of a presentation or change it, and that [`verify`]
 //! enforces it on what this crate issues.
 //!
-//! `validity_tests` holds the verifier to `exp` and `nbf` on tokens a foreign issuer
+//! `validity.rs` holds the verifier to `exp` and `nbf` on tokens a foreign issuer
 //! might emit. These are the other half: the credential this crate's issuer makes.
 
 use base64::Engine;

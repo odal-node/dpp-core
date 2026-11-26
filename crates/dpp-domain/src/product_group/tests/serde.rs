@@ -3,7 +3,7 @@
 
 use super::super::*;
 
-use super::data::test_textile_data;
+use super::common::test_textile_data;
 
 // ── Serde round-trips ─────────────────────────────────────────────────
 

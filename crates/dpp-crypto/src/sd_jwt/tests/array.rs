@@ -10,7 +10,7 @@ use proptest::prelude::*;
 use serde_json::{Value, json};
 
 use super::super::{Disclosure, SdJwt, SdJwtError, build_payload, conceal_elements};
-use super::disclosure::stub_jwt;
+use super::common::stub_jwt;
 
 fn processed(payload: &Value, disclosures: Vec<Disclosure>) -> Result<Value, SdJwtError> {
     SdJwt::new(stub_jwt(payload), disclosures)

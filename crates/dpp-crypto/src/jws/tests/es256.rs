@@ -1,6 +1,6 @@
 //! ES256 hazards: algorithm confusion between two 64-byte signature formats,
 //! JWK reading, and P-256 keys through the store. The vectors are in
-//! `wycheproof/es256.rs`, and the helpers both files use are here.
+//! `wycheproof/es256.rs`; the helpers they share are in `common.rs`.
 
 use base64::Engine;
 use serde_json::{Value, json};
@@ -10,72 +10,9 @@ use super::super::error::SignatureLengthError;
 use super::super::public_key::PublicKey;
 use super::super::signer;
 use super::super::verifier::verify_jws;
+use super::common::{B64, rfc7515_key};
 use crate::keystore::SigningMaterial;
 use crate::test_support::{temp_path, temp_store};
-
-pub(super) const B64: base64::engine::general_purpose::GeneralPurpose =
-    base64::engine::general_purpose::URL_SAFE_NO_PAD;
-
-/// The order of the P-256 group, big-endian.
-const N: [u8; 32] = hex32("FFFFFFFF00000000FFFFFFFFFFFFFFFFBCE6FAADA7179E84F3B9CAC2FC632551");
-/// `n / 2`, rounded down: an `S` above it is "high".
-const HALF_N: [u8; 32] = hex32("7FFFFFFF800000007FFFFFFFFFFFFFFFDE737D56D38BCF4279DCE5617E3192A8");
-
-const fn hex32(hex: &str) -> [u8; 32] {
-    let bytes = hex.as_bytes();
-    let mut out = [0u8; 32];
-    let mut i = 0;
-    while i < 32 {
-        out[i] = nibble(bytes[2 * i]) << 4 | nibble(bytes[2 * i + 1]);
-        i += 1;
-    }
-    out
-}
-
-const fn nibble(c: u8) -> u8 {
-    match c {
-        b'0'..=b'9' => c - b'0',
-        b'A'..=b'F' => c - b'A' + 10,
-        b'a'..=b'f' => c - b'a' + 10,
-        _ => panic!("not hex"),
-    }
-}
-
-pub(super) fn is_high_s(signature: &[u8]) -> bool {
-    signature[32..] > HALF_N[..]
-}
-
-/// `n − s`, the other valid `S` for the same `R`.
-pub(super) fn negate_s(signature: &[u8]) -> Vec<u8> {
-    let mut out = signature[..32].to_vec();
-    let s = &signature[32..];
-    let mut negated = [0u8; 32];
-    let mut borrow = 0i16;
-    for i in (0..32).rev() {
-        let mut d = i16::from(N[i]) - i16::from(s[i]) - borrow;
-        borrow = 0;
-        if d < 0 {
-            d += 256;
-            borrow = 1;
-        }
-        negated[i] = u8::try_from(d).expect("a byte");
-    }
-    out.extend_from_slice(&negated);
-    out
-}
-
-pub(super) fn p256(jwk: &Value) -> PublicKey {
-    PublicKey::from_jwk(jwk).expect("a P-256 JWK")
-}
-
-pub(super) fn rfc7515_key() -> PublicKey {
-    p256(&json!({
-        "kty": "EC",
-        "crv": "P-256",
-        "x": "f83OJ3D2xF1Bg8vub9tLe1gHMzV76e8Tus9uPHvRVEU",
-        "y": "x_FEzRu9m36HLN_tue659LNpXW6pCyStikYjKIWI5a0",
-    }))
-}
 
 // ── Algorithm confusion ───────────────────────────────────────────────────────
 

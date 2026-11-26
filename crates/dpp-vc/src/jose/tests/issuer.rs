@@ -1,7 +1,7 @@
 //! Verifying a credential's issuer: `iss` against `issuer` (VC-JOSE-COSE §4.1.2), and
 //! the absolute `kid` when there is no `iss` (§4.2).
 //!
-//! Tokens are forged, as in `verify_tests`: a genuine signature over a header or
+//! Tokens are forged, as in `verify.rs`: a genuine signature over a header or
 //! payload `sign_credential` would not write, so a refusal can only be the check it
 //! names.
 

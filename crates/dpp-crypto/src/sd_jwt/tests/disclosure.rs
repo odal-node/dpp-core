@@ -4,46 +4,12 @@
 //! credential is `dpp-vc` and is tested there. What is pinned is that the
 //! digests, salts and combined format behave as clause 4 and clause 7 say.
 
-use serde_json::{Map, Value, json};
+use serde_json::{Value, json};
 
 use super::super::builder::{SdJwt, build_payload, conceal};
 use super::super::disclosure::{Disclosure, digest_of};
 use super::super::error::{DisclosureError, SdJwtError};
-
-/// Sign nothing — these tests exercise the disclosure mechanism, and the JWS
-/// check is [`crate::jws::verifier`]'s. A stub JWT with a real payload is all
-/// the mechanism needs, and using one keeps a key out of tests that do not
-/// depend on signing.
-pub(super) fn stub_jwt(payload: &Value) -> String {
-    use base64::Engine;
-    let b64 = base64::engine::general_purpose::URL_SAFE_NO_PAD;
-    format!(
-        "{}.{}.{}",
-        b64.encode(br#"{"alg":"EdDSA","typ":"dc+sd-jwt"}"#),
-        b64.encode(payload.to_string()),
-        b64.encode([0u8; 64])
-    )
-}
-
-pub(super) fn sample() -> Map<String, Value> {
-    json!({
-        "batteryChemistry": "LFP",
-        "cathodeMaterial": ["LiFePO4"],
-        "stateOfHealthPct": 87.5,
-        "testReportResults": "report-4471",
-        "safetyMeasures": ["Do not puncture"],
-    })
-    .as_object()
-    .unwrap()
-    .clone()
-}
-
-pub(super) const HIDDEN: [&str; 4] = [
-    "cathodeMaterial",
-    "stateOfHealthPct",
-    "testReportResults",
-    "safetyMeasures",
-];
+use super::common::{HIDDEN, sample, stub_jwt};
 
 fn issue() -> SdJwt {
     let (concealed, disclosures) = conceal(&sample(), |name| HIDDEN.contains(&name)).unwrap();

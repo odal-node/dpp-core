@@ -1,5 +1,6 @@
 //! Tests of the `jws` module.
 
+mod common;
 mod crit;
 mod es256;
 mod es384_es512;

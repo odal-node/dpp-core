@@ -1,7 +1,7 @@
 //! How the collector walks a schema: which constructs add a path segment, and
 //! what happens at the edges of `$ref` resolution.
 //!
-//! Split from `ref_path_tests`, which covers what positioning a definition
+//! Split from `path.rs`, which covers what positioning a definition
 //! *buys*. This file covers what following a pointer must not break — none of
 //! these assert a class that moved, and none of them fail if `$ref` resolution
 //! is removed. That is deliberate: the cycle tests guard against a hang, which

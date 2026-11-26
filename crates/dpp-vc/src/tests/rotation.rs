@@ -5,7 +5,6 @@
 //! rotation still verifies against the DID document afterwards, and a revoked
 //! key's signature does not. `dpp-vc` is where they can see both halves.
 
-use std::future::Future;
 use std::sync::Arc;
 
 use base64::Engine;
@@ -16,6 +15,7 @@ use dpp_crypto::keystore::{KeyEntry, KeyStore};
 use dpp_domain::PassportId;
 use dpp_domain::ports::identity::IdentityPort;
 
+use super::common::{kid_named, verifies_in, without_waiting};
 use crate::local_service::LocalIdentityService;
 use crate::test_support::{EVERY_ALGORITHM, temp_store_with};
 
@@ -42,12 +42,6 @@ fn sign_as_current(store: &KeyStore, payload: &serde_json::Value) -> String {
 
 fn did_document(store: &KeyStore) -> serde_json::Value {
     crate::did_builder::build_did_document(store, ROTATION_BASE_URL, "issuer").expect("build")
-}
-
-/// Whether `jws` resolves in `doc` to a key it verifies under.
-pub(super) fn verifies_in(doc: &serde_json::Value, jws: &str) -> bool {
-    dpp_crypto::jws::verifier::resolve_verification_key(doc, jws)
-        .is_some_and(|key| dpp_crypto::jws::verifier::verify_jws(jws, &key).expect("verify"))
 }
 
 /// Regression (W-2): sign with key A, rotate to key B, verify old JWS against
@@ -279,23 +273,6 @@ fn a_token_whose_kid_names_the_other_key_of_its_document_is_refused() {
                 "{label}: the current key's signature, under the archived key's kid, must not verify"
             );
         }
-    }
-}
-
-/// The `kid` a compact JWS names, as a verifier reads it.
-pub(super) fn kid_named(jws: &str) -> String {
-    dpp_crypto::jws::verifier::extract_kid_from_jws(jws).expect("the token names a kid")
-}
-
-/// The output of a future that awaits nothing, as `sign_passport`'s does: it signs
-/// in process. Polled once on this thread, so many threads can sign at once without
-/// a runtime each.
-pub(super) fn without_waiting<F: Future>(future: F) -> F::Output {
-    let mut future = std::pin::pin!(future);
-    let mut context = std::task::Context::from_waker(std::task::Waker::noop());
-    match future.as_mut().poll(&mut context) {
-        std::task::Poll::Ready(output) => output,
-        std::task::Poll::Pending => panic!("the future waited"),
     }
 }
 

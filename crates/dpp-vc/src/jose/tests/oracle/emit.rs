@@ -16,8 +16,8 @@ use std::path::Path;
 
 use serde_json::{Value, json};
 
-use super::keys::{self, ALGORITHMS};
-use super::{high_s, token};
+use super::common::keys::{self, ALGORITHMS};
+use super::common::{high_s, token};
 use crate::jose::VerifyOptions;
 use crate::jose::{sign_credential, sign_presentation, verify_credential, verify_presentation};
 use crate::test_support::NOT_REQUIRED;
@@ -41,7 +41,7 @@ fn with_note(mut case: Value, key: &str, note: &str) -> Value {
     case
 }
 
-/// The suite's issuance inputs, rows 1 to 5, signed as `suite_issue_tests` signs
+/// The suite's issuance inputs, rows 1 to 5, signed as `suite/issue.rs` signs
 /// them. Row 5 is signed with its two terms declared, since it is refused without.
 fn suite_cases() -> Vec<Value> {
     let signed = |alg: &str, input: &str, kind: &str, terms: &[&str]| {

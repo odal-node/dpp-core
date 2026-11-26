@@ -19,7 +19,7 @@ import kotlin.system.exitProcess
  * Judge the `vc+sd-jwt` and `vp+sd-jwt` tokens `dpp_vc::jose` issues, with the EU digital
  * identity wallet's Kotlin SD-JWT library: the same corpus as
  * `.github/oracle/sdjwt/vc-sd-jwt.mjs`, which says how it is built
- * (`EMIT_VC_SD_JWT_CORPUS=1 cargo test -p dpp-vc --lib jose::sd_jwt_oracle_tests`).
+ * (`EMIT_VC_SD_JWT_CORPUS=1 cargo test -p dpp-vc --lib jose::tests::sd_jwt::oracle`).
  *
  * What it checks for each token: the signature under the published key (Nimbus: Ed25519 on
  * Tink, and ECDSA for P-256, P-384 and P-521), the Disclosures and their digests, which the

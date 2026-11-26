@@ -13,12 +13,11 @@ use serde_json::{Map, Value, json};
 use super::super::super::{
     ClaimPath, Disclosure, PathSegment, SdJwt, SdJwtError, build_payload, conceal, conceal_elements,
 };
+use super::super::common::stub_jwt;
 use super::super::common::{
     A3_ISSUED, A3_PRESENTATION, A3_PROCESSED, S51_ISSUED, S52_PRESENTATION, S52_PROCESSED,
 };
-use super::super::disclosure::stub_jwt;
-use super::super::select::path::digest_named;
-use super::super::select::path::digests_of;
+use super::common::{digest_named, digests_of};
 
 // --- the path itself ------------------------------------------------------------
 

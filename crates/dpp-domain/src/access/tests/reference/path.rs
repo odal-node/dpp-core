@@ -1,6 +1,6 @@
 //! A `$ref`'d definition carries its classes to every path that refers to it.
 //!
-//! `path_matching_tests` exercises the matcher on inline nesting. This file
+//! `../path_matching.rs` exercises the matcher on inline nesting. This file
 //! covers the case the shipped schemas actually use: every shared leaf in this
 //! crate's schemas lives in a `definitions` block reached by `$ref`, so a
 //! definition that could not be positioned was a definition whose class could
@@ -18,7 +18,7 @@
 //!
 //! `an_unreached_position_still_gets_the_definition_class` passes either way, by
 //! design — it pins the floor, which this change must leave alone. The walk's
-//! other invariants live in `ref_walk_tests`.
+//! other invariants live in `walk.rs`.
 //!
 //! Worth knowing when reading them: asserting a *resolved class* often cannot
 //! separate the two implementations, because the bare-leaf floor answers the

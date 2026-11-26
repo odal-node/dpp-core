@@ -10,7 +10,7 @@ use std::collections::BTreeSet;
 use serde_json::{Map, Value, json};
 
 use super::super::super::{ClaimPath, Disclosure, SdJwt, build_payload, conceal, conceal_elements};
-use super::super::disclosure::stub_jwt;
+use super::super::common::stub_jwt;
 
 /// An object of `members` members, `m0`, `m1`, and so on.
 fn object_of(members: usize) -> Map<String, Value> {

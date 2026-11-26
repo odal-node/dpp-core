@@ -6,19 +6,18 @@ use serde_json::{Value, json};
 
 use crate::sd_jwt::digest_of;
 
-use super::adversarial::Adversarial;
 use super::plan::{Issued, issue_to_plan, path, paths};
 use super::signing::Issuer;
 
 /// A small credential with every kind of Disclosure in it: two properties, a
 /// property inside an object, and an array element.
-pub(super) struct Base<'a> {
-    pub(super) issuer: &'a Issuer,
-    pub(super) issued: Issued,
+pub(crate) struct Base<'a> {
+    pub(crate) issuer: &'a Issuer,
+    pub(crate) issued: Issued,
 }
 
 impl<'a> Base<'a> {
-    pub(super) fn new(issuer: &'a Issuer) -> Self {
+    pub(crate) fn new(issuer: &'a Issuer) -> Self {
         let claims = json!({
             "iss": "https://issuer.example",
             "given_name": "Alice",
@@ -38,11 +37,11 @@ impl<'a> Base<'a> {
         }
     }
 
-    pub(super) fn payload(&self) -> Value {
+    pub(crate) fn payload(&self) -> Value {
         self.issued.payload.clone()
     }
 
-    pub(super) fn disclosures(&self) -> Vec<String> {
+    pub(crate) fn disclosures(&self) -> Vec<String> {
         self.issued
             .disclosures
             .iter()
@@ -50,11 +49,11 @@ impl<'a> Base<'a> {
             .collect()
     }
 
-    pub(super) fn digest(&self, spec: &[&str]) -> String {
+    pub(crate) fn digest(&self, spec: &[&str]) -> String {
         self.issued.digest_at[&path(spec)].clone()
     }
 
-    pub(super) fn disclosure(&self, spec: &[&str]) -> String {
+    pub(crate) fn disclosure(&self, spec: &[&str]) -> String {
         let digest = self.digest(spec);
         self.issued
             .disclosures
@@ -65,16 +64,16 @@ impl<'a> Base<'a> {
             .to_owned()
     }
 
-    pub(super) fn token(&self, payload: &Value, disclosures: &[String]) -> String {
+    pub(crate) fn token(&self, payload: &Value, disclosures: &[String]) -> String {
         self.issuer.token(payload, disclosures)
     }
 
-    pub(super) fn plain(&self) -> String {
+    pub(crate) fn plain(&self) -> String {
         self.token(&self.payload(), &self.disclosures())
     }
 
     /// The valid token with one change applied to its payload and Disclosures.
-    pub(super) fn altered(&self, change: impl FnOnce(&mut Value, &mut Vec<String>)) -> String {
+    pub(crate) fn altered(&self, change: impl FnOnce(&mut Value, &mut Vec<String>)) -> String {
         let (mut payload, mut disclosures) = (self.payload(), self.disclosures());
         change(&mut payload, &mut disclosures);
         self.token(&payload, &disclosures)
@@ -85,7 +84,7 @@ impl<'a> Base<'a> {
 ///
 /// The issuer puts decoy placeholders among the elements, so the one that stands for
 /// an element is not at the position of the element it hides.
-pub(super) fn nat_placeholder(payload: &Value, digest: &str) -> usize {
+pub(crate) fn nat_placeholder(payload: &Value, digest: &str) -> usize {
     payload["nat"]
         .as_array()
         .expect("the payload has nat")
@@ -95,17 +94,17 @@ pub(super) fn nat_placeholder(payload: &Value, digest: &str) -> usize {
 }
 
 /// A Disclosure written by hand: its encoding and its SHA-256 digest.
-pub(super) fn raw(json_text: &str) -> (String, String) {
+pub(crate) fn raw(json_text: &str) -> (String, String) {
     let encoded = B64.encode(json_text);
     let digest = digest_of(&encoded);
     (encoded, digest)
 }
 
-pub(super) fn sd(payload: &mut Value) -> &mut Vec<Value> {
+pub(crate) fn sd(payload: &mut Value) -> &mut Vec<Value> {
     payload["_sd"].as_array_mut().expect("the payload has _sd")
 }
 
-pub(super) fn add(out: &mut Vec<Adversarial>, id: &str, clause: &'static str, token: String) {
+pub(crate) fn add(out: &mut Vec<Adversarial>, id: &str, clause: &'static str, token: String) {
     out.push(Adversarial {
         id: id.to_owned(),
         clause,
@@ -114,10 +113,17 @@ pub(super) fn add(out: &mut Vec<Adversarial>, id: &str, clause: &'static str, to
 }
 
 /// A hand-written Disclosure, referenced from the root `_sd`.
-pub(super) fn with_disclosure(base: &Base<'_>, json_text: &str) -> String {
+pub(crate) fn with_disclosure(base: &Base<'_>, json_text: &str) -> String {
     base.altered(|payload, ds| {
         let (encoded, digest) = raw(json_text);
         sd(payload).push(json!(digest));
         ds.push(encoded);
     })
+}
+
+pub(crate) struct Adversarial {
+    pub(crate) id: String,
+    /// The clause of RFC 9901 the case turns on, or why it is an edge.
+    pub(crate) clause: &'static str,
+    pub(crate) token: String,
 }

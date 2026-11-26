@@ -39,7 +39,7 @@
 //! - [`calculator`] — [`calculate`], [`RepairabilityResult`], [`RepairabilityClass`].
 //! - [`parameters`] — [`RepairabilityInputs`].
 //! - [`thresholds`] — the [`RepairabilityRuleset`] trait + concrete rulesets.
-//! - `golden_vectors` — worked-example regression tests.
+//! - `tests/vectors.rs` — worked-example regression tests.
 
 pub mod calculator;
 pub mod parameters;

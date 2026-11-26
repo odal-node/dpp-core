@@ -9,7 +9,7 @@ use crate::{Audience, Disclosure};
 
 use super::super::filter::filter_by_audience;
 use super::super::policy::{DocumentScope, ProductGroupAccessPolicy};
-use super::audience::{battery_policy, filter_payload};
+use super::common::{battery_policy, filter_payload};
 
 #[test]
 fn the_annex_xiii_point_4_tier_is_withheld_through_the_real_catalog_policy() {

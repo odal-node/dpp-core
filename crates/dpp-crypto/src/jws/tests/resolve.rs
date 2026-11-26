@@ -208,7 +208,7 @@ fn only_an_ed25519_or_p256_jwk_resolves() {
 /// refuse. The control is a real key in the same document.
 #[test]
 fn a_key_that_is_not_a_point_on_the_curve_resolves_to_nothing() {
-    let mut flipped = hex::decode(super::rfc8032::public_hex("TEST 1")).expect("hex");
+    let mut flipped = hex::decode(super::common::public_hex("TEST 1")).expect("hex");
     flipped[0] ^= 1;
 
     let id = format!("{DID}#key-1");

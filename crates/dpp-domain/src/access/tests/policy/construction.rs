@@ -1,13 +1,13 @@
 //! Schema-driven policy construction, pinned: the rules a schema must satisfy to
 //! yield a policy at all, and the conservative reading of conditional, dotted,
-//! conflicting and budget-exceeding shapes. Split from `policy_tests` by size.
+//! conflicting and budget-exceeding shapes. Split from `derivation.rs` by size.
 
 use serde_json::json;
 
 use crate::{Audience, Disclosure};
 
 use super::super::super::policy::{DocumentScope, ProductGroupAccessPolicy};
-use super::super::audience::battery_policy;
+use super::super::common::battery_policy;
 
 /// A restriction declared inside `then` is enforced, although the branch may not
 /// apply: the walk collects conditional rules unconditionally, which is the safe

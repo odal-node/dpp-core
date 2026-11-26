@@ -508,7 +508,9 @@ fn rule_7_no_test_word_inside_tests() {
                 visit(&path, found);
             } else if path.extension().and_then(|e| e.to_str()) == Some("rs") {
                 let stem = path.file_stem().and_then(|s| s.to_str()).unwrap_or("");
-                if has_test_word(stem) {
+                if has_test_word(stem)
+                    && !read_source(&path).is_some_and(|src| has_deviation_marker(&src))
+                {
                     found.insert(rel(&path), "a file named for what it is".to_owned());
                 }
             }

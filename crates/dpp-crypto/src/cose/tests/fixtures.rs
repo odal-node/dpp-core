@@ -9,7 +9,7 @@
 //!
 //! Each file's SHA-256 is pinned below, and so is the Git blob it is at that commit
 //! (recorded for provenance; the test computes the SHA-256). A changed byte fails
-//! here, so a suite result in `suite_tests` is always a result on the suite's input.
+//! here, so a suite result in `suite.rs` is always a result on the suite's input.
 //! `.gitattributes` marks the directory `-text`, so a checkout that normalises line
 //! endings cannot change the bytes under the pin.
 

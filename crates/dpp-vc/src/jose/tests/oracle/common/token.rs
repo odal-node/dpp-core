@@ -15,25 +15,25 @@ fn segments(token: &str) -> [&str; 3] {
 }
 
 /// The protected header, decoded.
-pub(super) fn header(token: &str) -> Value {
+pub(crate) fn header(token: &str) -> Value {
     let bytes = B64.decode(segments(token)[0]).expect("base64url");
     serde_json::from_slice(&bytes).expect("a JSON header")
 }
 
 /// The raw signature, `R ‖ S` for ECDSA.
-pub(super) fn signature(token: &str) -> Vec<u8> {
+pub(crate) fn signature(token: &str) -> Vec<u8> {
     B64.decode(segments(token)[2]).expect("base64url")
 }
 
 /// The same token with its signature replaced.
-pub(super) fn with_signature(token: &str, signature: &[u8]) -> String {
+pub(crate) fn with_signature(token: &str, signature: &[u8]) -> String {
     let [header, payload, _] = segments(token);
     format!("{header}.{payload}.{}", B64.encode(signature))
 }
 
 /// The compact JWS of every `vc+jwt` envelope in a presentation's
 /// `verifiableCredential`, read as text, with its position.
-pub(super) fn envelope_tokens(presentation: &Value) -> Vec<(usize, String)> {
+pub(crate) fn envelope_tokens(presentation: &Value) -> Vec<(usize, String)> {
     presentation["verifiableCredential"]
         .as_array()
         .map(|list| {

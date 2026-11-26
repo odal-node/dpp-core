@@ -9,8 +9,8 @@ use base64::engine::general_purpose::URL_SAFE_NO_PAD as B64;
 use serde_json::{Map, Value, json};
 
 use super::super::super::{SdJwt, SdJwtError, build_payload, conceal, holder_key_confirmation};
-use super::super::disclosure::stub_jwt;
-use super::super::key_binding::{
+use super::super::common::stub_jwt;
+use super::super::common::{
     binding, decoded, every_digest, good_claims, holder, issued, issued_to, policy, rebound,
 };
 use crate::keystore::KeyStore;

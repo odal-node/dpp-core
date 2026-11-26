@@ -8,7 +8,7 @@ use serde_json::{Map, Value, json};
 
 use super::super::builder::conceal;
 use super::super::disclosure::Disclosure;
-use super::disclosure::{HIDDEN, sample};
+use super::common::{HIDDEN, sample};
 
 /// RFC 9901 clause 4.2.4.1: "The Issuer MUST hide the original order of the
 /// claims in the array."

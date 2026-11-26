@@ -34,8 +34,8 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use serde_json::{Value, json};
 
-use super::keys::{self, ALGORITHMS};
-use super::{high_s, token};
+use super::common::keys::{self, ALGORITHMS};
+use super::common::{high_s, token};
 use crate::jose::{verify_credential, verify_presentation};
 use crate::test_support::NOT_REQUIRED;
 use crate::test_support::at;

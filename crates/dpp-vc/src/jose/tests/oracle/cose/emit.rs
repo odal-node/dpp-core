@@ -17,9 +17,9 @@ use std::path::Path;
 use base64::Engine as _;
 use serde_json::{Value, json};
 
-use super::super::high_s;
-use super::super::keys::{self, ALGORITHMS};
-use super::message::{self, name_of, parts};
+use super::super::common::high_s;
+use super::super::common::keys::{self, ALGORITHMS};
+use super::common::{self, name_of, parts};
 use crate::jose::VerifyOptions;
 use crate::jose::{
     sign_credential_cose, sign_presentation_cose, verify_credential_cose, verify_presentation_cose,
@@ -55,7 +55,7 @@ fn case(
     })
 }
 
-/// The suite's issuance inputs, rows 27 and 28, signed as `suite_cose_tests` signs them.
+/// The suite's issuance inputs, rows 27 and 28, signed as `../../suite/cose.rs` signs them.
 fn suite_cases() -> Vec<Value> {
     let credential = suite_json("credential-minimal.json");
     let message = sign_credential_cose(
@@ -240,7 +240,7 @@ fn the_corpus_is_complete_and_this_crate_verifies_every_message_in_it() {
         // This crate writes the lower `S`; the library is asked to read it.
         if high_s::is_ecdsa(alg) {
             assert!(
-                !high_s::is_high_s(alg, &message::signature(&message)),
+                !high_s::is_high_s(alg, &common::signature(&message)),
                 "{id}: this crate signs low-S"
             );
         }

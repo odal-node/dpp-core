@@ -1,6 +1,6 @@
 //! Verifying a presentation: the outer token, and the shape of each envelope it lists.
 //!
-//! The credentials inside the envelopes are verified in `credentials_tests`.
+//! The credentials inside the envelopes are verified in `credentials.rs`.
 
 use base64::Engine as _;
 use serde_json::{Value, json};

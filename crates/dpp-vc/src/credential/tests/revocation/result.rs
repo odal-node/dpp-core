@@ -11,7 +11,7 @@ use chrono::{DateTime, Duration, Utc};
 use crate::status_list::StatusList;
 
 use super::super::super::*;
-use super::super::trust::{credential_with_status_index, sample_credential};
+use super::super::common::{credential_with_status_index, sample_credential};
 
 /// Runs both revocation verifiers on one credential, trusting its issuer, and
 /// asserts each returns `expected`.

@@ -30,11 +30,11 @@
 use serde_json::{Value, json};
 
 use super::super::super::{Disclosure, SdJwt, digest_of};
+use super::super::common::stub_jwt;
 use super::super::common::{
     A2_PRESENTATION, A2_PROCESSED, S51_ARRAY_DISCLOSURES, S51_INPUT, S51_ISSUED, S52_PRESENTATION,
     S52_PROCESSED,
 };
-use super::super::disclosure::stub_jwt;
 
 /// Clause 4.2.2: the Disclosure for the second element of `["DE", "FR", "US"]`.
 const RFC_FR: &str = "WyJsa2x4RjVqTVlsR1RQVW92TU5JdkNBIiwgIkZSIl0";

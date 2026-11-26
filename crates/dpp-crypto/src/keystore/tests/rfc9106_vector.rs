@@ -1,7 +1,7 @@
 //! RFC 9106 clause 5.3's Argon2id test vector, checked against the `argon2`
 //! crate the keystore derives its keys with.
 //!
-//! The frozen derivation vectors in `all.rs` were produced by this same crate,
+//! The frozen derivation vectors in `kdf.rs` were produced by this same crate,
 //! at an earlier version. They pin that a derivation never changes under
 //! existing stores, which is worth having, but they cannot show that the
 //! function is Argon2id as RFC 9106 defines it: if the crate had always computed
@@ -13,7 +13,7 @@
 //! through the crate directly, with the algorithm and version the keystore
 //! selects and through the same entry point. That shows the crate implements the
 //! function the keystore asks of it. The keystore's parameters remain its own
-//! choice, held by `all.rs`.
+//! choice, held by `kdf.rs`.
 
 use argon2::{Algorithm, Argon2, AssociatedData, ParamsBuilder, Version};
 

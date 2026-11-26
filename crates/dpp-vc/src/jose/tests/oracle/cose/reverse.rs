@@ -32,9 +32,9 @@ use std::collections::{BTreeMap, BTreeSet};
 use base64::Engine as _;
 use serde_json::{Value, json};
 
-use super::super::high_s;
-use super::super::keys::{self, ALGORITHMS};
-use super::message::{name_of, parts, signature, with_signature};
+use super::super::common::high_s;
+use super::super::common::keys::{self, ALGORITHMS};
+use super::common::{name_of, parts, signature, with_signature};
 use crate::jose::{VerifyOptions, verify_credential_cose, verify_presentation_cose};
 use crate::test_support::NOT_REQUIRED;
 use dpp_crypto::cose::verify_sign1;
@@ -248,7 +248,7 @@ fn what_an_independent_library_signed_reads_back_here() {
         return;
     };
     // Tests run in the crate directory, so a relative path is read from the workspace root,
-    // where `cose_emit` writes and where the command is run from.
+    // where `cose/emit.rs` writes and where the command is run from.
     let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("../..")
         .join(given);

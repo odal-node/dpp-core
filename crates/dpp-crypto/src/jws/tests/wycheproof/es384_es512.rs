@@ -64,10 +64,9 @@ use super::super::super::algorithm::KeyAlgorithm;
 use super::super::super::public_key::PublicKey;
 use super::super::super::signer;
 use super::super::super::verifier::verify_jws;
-use super::super::es256::B64;
-use super::super::es384_es512::{
-    HALF_P384, HALF_P521, ORDER_P384, ORDER_P521, RFC6979_P384_UX, RFC6979_P384_UY, is_high_s,
-    negate_s, rfc7515_p521_key,
+use super::super::common::{
+    B64, HALF_P384, HALF_P521, RFC6979_P384_UX, RFC6979_P384_UY, hex_bytes, is_high_s,
+    rfc7515_p521_key,
 };
 use crate::keystore::SigningMaterial;
 use crate::test_support::temp_store;
@@ -369,4 +368,33 @@ fn this_crate_verifies_what_ring_signs_including_high_s_p384() {
         assert!(verify_jws(&jws, &key).expect("well-formed"), "case {i}");
     }
     assert!(high > 40, "ring produced {high} high-S signatures of 200");
+}
+
+/// The group order `n` of P-384, big-endian.
+pub(super) const ORDER_P384: [u8; 48] = hex_bytes(
+    "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFC7634D81F4372DDF581A0DB248B0A77AECEC196ACCC52973",
+);
+
+/// The group order `n` of P-521, big-endian, in its 66 octets.
+pub(super) const ORDER_P521: [u8; 66] = hex_bytes(
+    "01FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFA51868783BF2F966B7FCC0148F709A5D03BB5C9B8899C47AEBB6FB71E91386409",
+);
+
+/// `n − s`, the other valid `S` for the same `R`, over the `N`-octet order.
+pub(super) fn negate_s<const N: usize>(order: &[u8; N], signature: &[u8]) -> Vec<u8> {
+    let mut out = signature[..N].to_vec();
+    let s = &signature[N..];
+    let mut negated = [0u8; N];
+    let mut borrow = 0i16;
+    for i in (0..N).rev() {
+        let mut d = i16::from(order[i]) - i16::from(s[i]) - borrow;
+        borrow = 0;
+        if d < 0 {
+            d += 256;
+            borrow = 1;
+        }
+        negated[i] = u8::try_from(d).expect("a byte");
+    }
+    out.extend_from_slice(&negated);
+    out
 }
