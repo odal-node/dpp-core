@@ -90,4 +90,11 @@ test = false
 doc = false
 bench = false
 
+[[bin]]
+name = "resolve_verification_key"
+path = "fuzz_targets/resolve_verification_key.rs"
+test = false
+doc = false
+bench = false
+
 [workspace]

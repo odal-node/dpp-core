@@ -14,6 +14,7 @@ property: any input returns `Ok` or `Err` (or `Some` or `None`), never a panic.
 | `digital_link_parse` | `DigitalLink::parse` on GS1 Digital Link URI bytes | A scanned QR code |
 | `plugin_abi_envelope` | `AbiResult` and `PluginCapabilities` JSON | A Wasm plugin's output |
 | `jws_verify` | `verify_jws` and `extract_kid_from_jws` on compact tokens, against a key nobody can sign for, so a token that verifies is a failure too | A passport fetched from another operator, a proof file |
+| `resolve_verification_key` | `resolve_verification_key` on a DID document and a compact token, then `verify_jws` under any key it resolves; the two are split at the first zero byte | A DID document and a token fetched from another operator |
 | `cose_sign1_verify` | `verify_sign1` on `COSE_Sign1` bytes, against a key nobody can sign for, so a message that verifies is a failure too; its unknown header parameters carry any CBOR value, which the target reaches | A credential or presentation secured with COSE |
 | `sd_jwt_parse` | `SdJwt::parse` and `Disclosure::parse` | A holder's selectively disclosed presentation |
 | `status_list_decode` | `StatusList::from_encoded_list` (base64url, then gzip) and `get` | A credential issuer's revocation list |

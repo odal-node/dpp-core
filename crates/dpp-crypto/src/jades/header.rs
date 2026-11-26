@@ -10,8 +10,8 @@ use sha2::{Digest, Sha256};
 
 /// Why a header could not be built.
 ///
-/// Both variants are the same rule read twice: a header parameter that is
-/// present and empty is not a present header parameter. *Omitting* the
+/// The first two variants are the same rule read twice: a header parameter that
+/// is present and empty is not a present header parameter. *Omitting* the
 /// signing-certificate reference entirely is unrepresentable — [`JadesHeader`]
 /// takes a [`CertificateRef`] rather than an `Option<CertificateRef>`, so the
 /// clause 5.1.7 requirement is carried by the type — but the variants' fields
@@ -32,6 +32,13 @@ pub enum JadesError {
     /// serialised as `""` references no certificate — so the signature would
     /// carry the header without carrying the reference.
     EmptyThumbprint,
+    /// `x5t#S256` is not the SHA-256 digest of the first `x5c` certificate, or
+    /// that certificate is not base64 at all.
+    ///
+    /// The two halves of [`CertificateRef::ChainWithThumbprint`] must name the
+    /// same signing certificate. Otherwise the header would reference one
+    /// certificate and carry another.
+    ThumbprintMismatch,
 }
 
 impl std::fmt::Display for JadesError {
@@ -47,6 +54,12 @@ impl std::fmt::Display for JadesError {
                 "x5t#S256 was supplied as an empty string, so the signature carries \
                  the parameter without the signing-certificate reference TS 119 182-1 \
                  Table 1 gives cardinality 1"
+            ),
+            Self::ThumbprintMismatch => write!(
+                f,
+                "x5t#S256 is not the SHA-256 digest of the first x5c certificate, or that \
+                 certificate is not base64, so the signature would reference one certificate \
+                 and carry another"
             ),
         }
     }
@@ -193,12 +206,11 @@ impl CertificateRef {
     /// until the header is serialised — which caught the empty chain
     /// and not the empty thumbprint.
     ///
-    /// Still deliberately **not** checked here: whether `thumbprint` is actually
-    /// the digest of `chain[0]`. That is a question about whether the reference
-    /// is *correct*, not whether the format is present, and this method's scope
-    /// is the second. A caller needing the first wants a verifier, not a
-    /// predicate — but see the type's tests, which pin that this is a known
-    /// boundary rather than an oversight.
+    /// This predicate still answers only whether the format is present. It does
+    /// not check that `thumbprint` is the digest of `chain[0]`: serialising the
+    /// header does. [`JadesHeader::to_json_bytes`] refuses a thumbprint that is
+    /// not the first certificate's digest, so a header that contradicts itself
+    /// is never written.
     #[must_use]
     pub fn is_eu_recognised_profile(&self) -> bool {
         match self {
@@ -266,6 +278,15 @@ impl CertificateRef {
                 Ok(())
             }
             Self::ChainWithThumbprint { chain, thumbprint } => {
+                // The guard above leaves `chain` non-empty, so `chain[0]` is the
+                // signing certificate. An entry that is not base64 has no digest
+                // to compare with, so it is the same mismatch.
+                let signing = base64::engine::general_purpose::STANDARD
+                    .decode(&chain[0])
+                    .map_err(|_| JadesError::ThumbprintMismatch)?;
+                if Self::thumbprint_of_der(&signing) != Self::Thumbprint(thumbprint.clone()) {
+                    return Err(JadesError::ThumbprintMismatch);
+                }
                 map.insert("x5c".to_owned(), chain_value(chain));
                 map.insert("x5t#S256".to_owned(), Value::String(thumbprint.clone()));
                 Ok(())
