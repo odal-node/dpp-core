@@ -15,14 +15,16 @@ use std::path::Path;
 
 use serde_json::{Value, json};
 
-use crate::sd_jwt::SdJwt;
+use crate::sd_jwt::{KeyBindingPolicy, SdJwt};
 
 use super::adversarial;
 use super::bound;
-use super::issued::{self, show};
-use super::plan::{self, Rng, issue_to_plan};
+use super::common::{
+    AUDIENCE, Issuer, NONCE, Rng, WINDOW, bound_structure, every_presentation, issue_to_plan, ours,
+    ours_bound, reveal, sampled_presentations, show, structure,
+};
+use super::issued;
 use super::rfc;
-use super::signing::{Issuer, bound_structure, ours, ours_bound, structure};
 
 /// A hand-listed plan this small is presented every way; a larger one is sampled.
 const ENUMERATE_UP_TO: usize = 8;
@@ -44,15 +46,15 @@ fn build(issuer: &Issuer) -> Corpus {
         let jwt = issuer.sign(&issued.payload);
         let sd_jwt = SdJwt::new(jwt, issued.disclosures.clone());
 
-        let sets: Vec<BTreeSet<plan::Path>> = if case.hidden.len() <= ENUMERATE_UP_TO {
-            plan::every_presentation(&case.hidden)
+        let sets: Vec<BTreeSet<super::common::Path>> = if case.hidden.len() <= ENUMERATE_UP_TO {
+            every_presentation(&case.hidden)
         } else {
             let seed = case
                 .id
                 .bytes()
                 .fold(7u64, |h, b| h.wrapping_mul(31).wrapping_add(u64::from(b)));
             let mut rng = Rng(seed);
-            plan::sampled_presentations(&case.hidden, &mut rng, SAMPLES)
+            sampled_presentations(&case.hidden, &mut rng, SAMPLES)
         };
         for (n, presented) in sets.iter().enumerate() {
             let digests: Vec<&str> = presented
@@ -63,7 +65,7 @@ fn build(issuer: &Issuer) -> Corpus {
                 .present(&digests)
                 .expect("a reachable selection presents")
                 .serialise();
-            let expected = plan::reveal(&case.claims, &case.hidden, presented);
+            let expected = reveal(&case.claims, &case.hidden, presented);
             let everything = presented.len() == case.hidden.len();
             let id = if everything {
                 format!("issued/{}", case.id)
@@ -101,7 +103,7 @@ fn build(issuer: &Issuer) -> Corpus {
         .ok()
         .and_then(|d| i64::try_from(d.as_secs()).ok())
         .expect("a clock after 1970");
-    let policy = bound::policy(now);
+    let policy = policy(now);
     for case in bound::cases(issuer, now) {
         corpus.cases.push(json!({
             "id": format!("bound/{}", case.id),
@@ -109,10 +111,10 @@ fn build(issuer: &Issuer) -> Corpus {
             "clause": case.clause,
             "token": case.token,
             "challenge": {
-                "aud": bound::AUDIENCE,
-                "nonce": bound::NONCE,
+                "aud": AUDIENCE,
+                "nonce": NONCE,
                 "now": now,
-                "window": bound::WINDOW,
+                "window": WINDOW,
             },
             "ours": ours_bound(&case.token, &issuer.public_key_b64, &policy).to_json(),
         }));
@@ -186,7 +188,7 @@ fn the_corpus_is_complete_and_this_crate_reads_every_token_it_issued_back_to_the
     }) {
         let token = case["token"].as_str().expect("a string");
         let verdict = match case["challenge"]["now"].as_i64() {
-            Some(now) => bound_structure(token, &bound::policy(now)),
+            Some(now) => bound_structure(token, &policy(now)),
             None => structure(token),
         };
         assert_eq!(
@@ -234,4 +236,15 @@ fn the_corpus_is_complete_and_this_crate_reads_every_token_it_issued_back_to_the
         count(&corpus, "rfc"),
         dir.display()
     );
+}
+
+/// The policy a Verifier holds every case to, at `now`.
+fn policy(now: i64) -> KeyBindingPolicy {
+    KeyBindingPolicy {
+        audience: AUDIENCE.to_owned(),
+        nonce: NONCE.to_owned(),
+        now,
+        max_age: WINDOW,
+        leeway: WINDOW,
+    }
 }

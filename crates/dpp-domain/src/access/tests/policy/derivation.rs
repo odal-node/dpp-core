@@ -6,7 +6,7 @@ use serde_json::json;
 use crate::{Audience, Disclosure, ProductGroupCatalog};
 
 use super::super::super::policy::{DocumentScope, ProductGroupAccessPolicy};
-use super::super::audience::{battery_policy, filter_payload};
+use super::super::common::{battery_policy, filter_payload};
 
 /// The schema-sourced policy agrees with the catalog map it will replace.
 ///

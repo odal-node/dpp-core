@@ -7,7 +7,7 @@
 //! **Nothing in either repository calls it yet.** It previously claimed to be
 //! "consumed by the CLI `odal calc status` view", and there is no such command —
 //! a reader deciding whether this map was load-bearing would have concluded it
-//! was. Its only callers are the drift guards in `tests.rs`, which is worth
+//! was. Its only callers are the drift guards in `tests/resolve.rs`, which is worth
 //! having on its own (they are what keep this table and the `resolve_*` row
 //! tables from disagreeing), but it is not yet wired to a surface.
 //!

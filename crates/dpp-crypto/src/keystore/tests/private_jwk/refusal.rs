@@ -1,17 +1,15 @@
 //! The refusals of [`KeyEntry::from_private_jwk`]: one test for each rule the constructor
 //! enforces. Each refused JWK is a mutated copy of one of the W3C VC-JOSE-COSE suite's key
 //! files, or a key generated while the test runs. The helpers and constants are those of
-//! `private_jwk_tests`. No private key is written into this file.
+//! `keys.rs`. No private key is written into this file.
 
 use base64::Engine;
-use serde_json::json;
+use serde_json::{Value, json};
 
 use super::super::super::KeyEntry;
 use super::super::super::entry::SigningMaterial;
 use super::super::super::error::PrivateJwkError;
-use super::super::private_jwk::keys::{
-    B64, ORDERS, SUITE, d_octets, public, refused, secret, with_d,
-};
+use super::common::{B64, SUITE, public, secret};
 use crate::jws::algorithm::KeyAlgorithm;
 
 /// A public-only JWK has no `d`, so it is refused as not private.
@@ -253,4 +251,44 @@ fn an_off_curve_public_point_is_refused() {
         jwk["y"] = json!(B64.encode(&y));
         assert_eq!(refused(&jwk), PrivateJwkError::PublicKeyInvalid, "{name}");
     }
+}
+
+/// The three EC curves of [`SUITE`], each with its algorithm and its group order `n`,
+/// big-endian. The order is checked below: `n − 1` is a scalar and `n` is not.
+pub(super) const ORDERS: [(&str, KeyAlgorithm, &str); 3] = [
+    (
+        "p256",
+        KeyAlgorithm::EcdsaP256,
+        "FFFFFFFF00000000FFFFFFFFFFFFFFFFBCE6FAADA7179E84F3B9CAC2FC632551",
+    ),
+    (
+        "p384",
+        KeyAlgorithm::EcdsaP384,
+        "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFC7634D81F4372DDF581A0DB248B0A77AECEC196ACCC52973",
+    ),
+    (
+        "p521",
+        KeyAlgorithm::EcdsaP521,
+        "01FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFA51868783BF2F966B7FCC0148F709A5D03BB5C9B8899C47AEBB6FB71E91386409",
+    ),
+];
+
+/// The refusal a JWK gets. A JWK that breaks no rule is a failed test.
+pub(super) fn refused(jwk: &Value) -> PrivateJwkError {
+    match KeyEntry::from_private_jwk(jwk) {
+        Ok(_) => panic!("a JWK that breaks a rule was accepted"),
+        Err(error) => error,
+    }
+}
+
+/// `d` of `jwk`, decoded. Used only to build the test's own copies.
+pub(super) fn d_octets(jwk: &Value) -> Vec<u8> {
+    B64.decode(jwk["d"].as_str().expect("d"))
+        .expect("base64url")
+}
+
+/// `jwk` with `d` set to `octets`.
+pub(super) fn with_d(mut jwk: Value, octets: &[u8]) -> Value {
+    jwk["d"] = json!(B64.encode(octets));
+    jwk
 }

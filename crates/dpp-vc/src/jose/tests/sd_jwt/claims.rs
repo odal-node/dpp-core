@@ -140,7 +140,7 @@ fn a_reserved_claim_hidden_in_a_disclosure_is_refused_when_it_is_disclosed() {
 
 /// Section 4.2 opens "When using controlled identifier documents with this specification",
 /// and a verifier here is given its key, so a `kid` that is not an absolute URL verifies, as it
-/// does for a `vc+jwt`. The signer refuses it: see `sd_jwt_refusal_tests`.
+/// does for a `vc+jwt`. The signer refuses it: see `refusal.rs`.
 #[test]
 fn without_an_iss_a_kid_that_is_not_an_absolute_url_verifies() {
     let key = key();

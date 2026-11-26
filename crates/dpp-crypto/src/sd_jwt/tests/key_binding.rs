@@ -5,93 +5,13 @@
 //! real, with a Holder key from a key store, because its signature is part of
 //! what clause 7.3 asks this crate to check.
 
-use base64::Engine;
-use base64::engine::general_purpose::URL_SAFE_NO_PAD as B64;
-use serde_json::{Map, Value, json};
+use serde_json::{Value, json};
 
-use super::super::{
-    KeyBinding, KeyBindingPolicy, SdJwt, SdJwtError, build_payload, conceal,
-    holder_key_confirmation,
+use super::super::{SdJwt, SdJwtError, holder_key_confirmation};
+use super::common::{
+    A3_PRESENTATION, A4_PRESENTATION, NOW, S52_PRESENTATION, binding, decoded, every_digest,
+    good_claims, holder, issued, issued_to, policy, rebound,
 };
-use super::common::{A3_PRESENTATION, A4_PRESENTATION, S52_PRESENTATION};
-use super::disclosure::stub_jwt;
-use crate::jws::signer::sign_with_header;
-use crate::keystore::KeyEntry;
-use crate::test_support::temp_store;
-
-const NOW: i64 = 1_800_000_000;
-
-pub(super) fn holder(label: &str) -> KeyEntry {
-    temp_store(label, "holder")
-        .load_key("holder")
-        .expect("the key was just made")
-}
-
-pub(super) fn binding() -> KeyBinding {
-    KeyBinding {
-        audience: "https://verifier.example".to_owned(),
-        nonce: "n-0S6_WzA2Mj".to_owned(),
-        issued_at: NOW,
-    }
-}
-
-pub(super) fn policy() -> KeyBindingPolicy {
-    KeyBindingPolicy {
-        audience: "https://verifier.example".to_owned(),
-        nonce: "n-0S6_WzA2Mj".to_owned(),
-        now: NOW,
-        max_age: 300,
-        leeway: 60,
-    }
-}
-
-/// A token whose Issuer named `cnf`, with `given_name` and `family_name` hidden.
-pub(super) fn issued_to(cnf: Value) -> SdJwt {
-    let mut claims = json!({
-        "iss": "https://issuer.example",
-        "given_name": "Erika",
-        "family_name": "Mustermann",
-    })
-    .as_object()
-    .unwrap()
-    .clone();
-    claims.insert("cnf".to_owned(), cnf);
-    let (kept, disclosures) = conceal(&claims, |n| n.ends_with("_name")).unwrap();
-    SdJwt::new(stub_jwt(&build_payload(kept, true)), disclosures)
-}
-
-pub(super) fn issued(holder: &KeyEntry) -> SdJwt {
-    issued_to(holder_key_confirmation(&holder.public_key()))
-}
-
-pub(super) fn every_digest(sd_jwt: &SdJwt) -> Vec<String> {
-    sd_jwt.disclosures().iter().map(|d| d.digest()).collect()
-}
-
-pub(super) fn decoded(jwt: &str, part: usize) -> Map<String, Value> {
-    let bytes = B64.decode(jwt.split('.').nth(part).unwrap()).unwrap();
-    serde_json::from_slice(&bytes).unwrap()
-}
-
-/// `presentation` with its Key Binding JWT replaced by one signed by `key` over
-/// `header` and `claims`, so a test can break one thing at a time.
-pub(super) fn rebound(presentation: &SdJwt, key: &KeyEntry, header: Value, claims: Value) -> SdJwt {
-    let header = header.as_object().unwrap().clone();
-    let kb = sign_with_header(key, &header, claims.to_string().as_bytes())
-        .expect("an unrevoked key signs");
-    let unbound = presentation.serialise();
-    let (sd_jwt, _) = unbound.rsplit_once('~').unwrap();
-    SdJwt::parse(&format!("{sd_jwt}~{kb}")).unwrap()
-}
-
-pub(super) fn good_claims(presentation: &SdJwt) -> Value {
-    json!({
-        "iat": NOW,
-        "aud": "https://verifier.example",
-        "nonce": "n-0S6_WzA2Mj",
-        "sd_hash": presentation.sd_hash(),
-    })
-}
 
 fn kb_header() -> Value {
     json!({ "alg": "EdDSA", "typ": "kb+jwt" })

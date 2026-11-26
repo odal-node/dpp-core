@@ -4,7 +4,6 @@ use base64::Engine;
 
 use super::super::*;
 use super::common::*;
-use super::table_1::table_1_b_b_violations;
 
 /// `now()` claims a signing time in whole seconds, close to now.
 #[test]

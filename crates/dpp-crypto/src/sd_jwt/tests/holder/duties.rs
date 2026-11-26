@@ -11,7 +11,7 @@ use serde_json::{Map, Value, json};
 use super::super::super::{
     Disclosure, SdJwt, SdJwtError, build_payload, conceal, conceal_elements,
 };
-use super::super::disclosure::stub_jwt;
+use super::super::common::stub_jwt;
 
 /// Clause 4.2.6's example: every nationality hidden, then the array itself.
 fn nationalities() -> (SdJwt, Vec<Disclosure>, Disclosure) {

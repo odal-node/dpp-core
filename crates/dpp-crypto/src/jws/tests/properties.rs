@@ -34,7 +34,7 @@ fn arb_json() -> impl Strategy<Value = serde_json::Value> {
 /// The public key of RFC 8032 clause 7.1's TEST 1, so verification reaches the
 /// signature check.
 fn fixed_key() -> super::super::PublicKey {
-    let raw = hex::decode(super::rfc8032::public_hex("TEST 1")).expect("hex");
+    let raw = hex::decode(super::common::public_hex("TEST 1")).expect("hex");
     super::super::PublicKey::from_bytes(super::super::KeyAlgorithm::Ed25519, &raw)
         .expect("an RFC 8032 key")
 }
@@ -46,9 +46,9 @@ fn fixed_key() -> super::super::PublicKey {
 fn fixed_keys() -> [super::super::PublicKey; 4] {
     [
         fixed_key(),
-        super::es256::rfc7515_key(),
-        super::es384_es512::rfc6979_p384_key(),
-        super::es384_es512::rfc7515_p521_key(),
+        super::common::rfc7515_key(),
+        super::common::rfc6979_p384_key(),
+        super::common::rfc7515_p521_key(),
     ]
 }
 
@@ -197,7 +197,7 @@ proptest! {
             b64.encode(b"{}"),
             b64.encode(&sig),
         );
-        let verdict = verify_jws(&jws, &super::es256::rfc7515_key());
+        let verdict = verify_jws(&jws, &super::common::rfc7515_key());
         if sig.len() != 64 {
             prop_assert!(verdict.is_err());
         }

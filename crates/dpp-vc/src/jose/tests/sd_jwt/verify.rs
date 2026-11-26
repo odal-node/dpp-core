@@ -3,7 +3,7 @@
 //!
 //! Tokens are forged where a refusal has to be only the check it names: a genuine
 //! signature over a header or payload that `sign_credential_sd_jwt` would never write. The
-//! suite's inputs are in `suite_sdjwt_tests`.
+//! suite's inputs are in `../suite/sdjwt.rs`.
 
 use serde_json::{Value, json};
 

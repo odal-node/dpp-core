@@ -50,8 +50,8 @@ fn disagreements(file: &Value) -> Vec<String> {
         let reading = SdJwt::parse(token)
             .map_err(|e| format!("{e:?}"))
             .and_then(|sd_jwt| {
-                let Some(issuer_key) = super::signing::ed25519_key(key) else {
-                    return Err(super::signing::NOT_A_KEY.to_owned());
+                let Some(issuer_key) = super::common::ed25519_key(key) else {
+                    return Err(super::common::NOT_A_KEY.to_owned());
                 };
                 match verify_jws(sd_jwt.jwt(), &issuer_key) {
                     Ok(true) => {}
@@ -192,8 +192,7 @@ fn what_an_independent_implementation_issued_reads_back_here() {
 fn the_readback_check_fails_on_a_mismatch() {
     use serde_json::json;
 
-    use super::plan::{issue_to_plan, paths};
-    use super::signing::Issuer;
+    use super::common::{Issuer, issue_to_plan, paths};
 
     let issuer = Issuer::new();
     let claims = json!({"a": 1, "b": ["x", "y"]});
@@ -271,7 +270,7 @@ fn the_readback_check_fails_on_a_mismatch() {
 
     // A bound token is read with its Key Binding JWT checked: under the challenge
     // it answers it reads back, and under another nonce it is reported.
-    let holder = super::signing::holder("sdjwt-oracle-reverse-holder");
+    let holder = super::common::holder("sdjwt-oracle-reverse-holder");
     let mut bound_claims = claims.clone();
     bound_claims["cnf"] = crate::sd_jwt::holder_key_confirmation(&holder.public_key());
     let plan = issue_to_plan(&bound_claims, &paths(&[&["a"]]));

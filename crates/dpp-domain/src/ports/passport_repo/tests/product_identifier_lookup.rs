@@ -6,7 +6,7 @@
 //! model-level record only and the carrier lookup needs a qualifier.
 
 use super::super::port::PassportRepository;
-use super::port::{InMemoryRepo, fixture_identifier, identified_passport};
+use super::common::{InMemoryRepo, fixture_identifier, identified_passport};
 use crate::Granularity;
 use crate::identifier::ProductIdentifier;
 use crate::passport::Passport;

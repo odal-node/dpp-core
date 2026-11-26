@@ -3,7 +3,7 @@
 //! [`AuthenticationFailure`] names each thing an issuer would go and fix, and the
 //! untyped function is the typed one with the reason folded away, so the two
 //! cannot disagree about a token. The envelope's own acceptance and refusal cases
-//! are in `jwt_tests`, whose fixtures these share.
+//! are in `envelope.rs`, whose fixtures these share.
 
 use base64::Engine as _;
 use serde_json::json;

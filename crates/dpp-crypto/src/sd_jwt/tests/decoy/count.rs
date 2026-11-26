@@ -1,7 +1,7 @@
 //! `conceal_to`: a caller that knows how many members an object could hide states it, and
 //! the `_sd` array is that long whatever the object hides.
 //!
-//! `decoy_tests` pins the bucket a caller that states no count gets. These pin what a
+//! `length.rs` pins the bucket a caller that states no count gets. These pin what a
 //! count buys over it: no bucket step, and an object that hides nothing still looks like
 //! one that could.
 
@@ -10,7 +10,7 @@ use std::collections::BTreeSet;
 use serde_json::{Map, Value, json};
 
 use super::super::super::{SdJwt, build_payload, conceal, conceal_to};
-use super::super::disclosure::stub_jwt;
+use super::super::common::stub_jwt;
 
 /// An object of `members` members, `m0`, `m1`, and so on.
 fn object_of(members: usize) -> Map<String, Value> {

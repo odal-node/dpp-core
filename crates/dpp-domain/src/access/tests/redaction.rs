@@ -9,7 +9,7 @@ use crate::{Audience, Disclosure};
 
 use super::super::filter::filter_by_audience;
 use super::super::policy::ProductGroupAccessPolicy;
-use super::audience::filter_payload;
+use super::common::filter_payload;
 
 /// A policy classifying one **product-group** field — the scope a schema's
 /// `x-disclosure` annotations live in. Tests using it put their data under

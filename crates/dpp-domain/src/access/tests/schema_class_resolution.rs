@@ -1,6 +1,6 @@
 //! Every disclosure class declared in a shipped schema resolves to itself.
 //!
-//! Separate from `path_matching_tests`, which exercises the matcher on synthetic
+//! Separate from `path_matching.rs`, which exercises the matcher on synthetic
 //! policies: this one asks the only question that matters about real data —
 //! did any actual field's class move?
 

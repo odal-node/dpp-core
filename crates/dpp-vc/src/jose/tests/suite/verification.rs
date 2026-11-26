@@ -6,9 +6,9 @@
 //! [`JoseError`], and for the rows that are refused for a header or a claim, that
 //! the signature is valid, so the refusal is provably the check it names and not a
 //! signature that never verified. Rows 1 to 5, which issue, are in
-//! `suite_issue_tests`.
+//! `issue.rs`.
 //!
-//! The suite has no input with `crit`, so `crit` is tested in `verify_tests`
+//! The suite has no input with `crit`, so `crit` is tested in `../verify.rs`
 //! instead.
 
 use dpp_crypto::jws::verifier::verify_jws;

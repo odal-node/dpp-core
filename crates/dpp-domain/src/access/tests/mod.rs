@@ -2,6 +2,7 @@
 
 mod audience;
 mod classification;
+mod common;
 mod concealable_members;
 mod envelope_opening;
 mod lattice;

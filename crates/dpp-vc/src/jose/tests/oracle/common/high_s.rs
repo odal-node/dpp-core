@@ -24,7 +24,7 @@ const ORDERS: [(&str, &str); 3] = [
 ];
 
 /// Whether `alg` is one of the ECDSA algorithms.
-pub(super) fn is_ecdsa(alg: &str) -> bool {
+pub(crate) fn is_ecdsa(alg: &str) -> bool {
     ORDERS.iter().any(|(name, _)| *name == alg)
 }
 
@@ -48,14 +48,14 @@ fn half(order: &[u8]) -> Vec<u8> {
 }
 
 /// Whether `signature` (`R ‖ S`) has an `S` above `n / 2`.
-pub(super) fn is_high_s(alg: &str, signature: &[u8]) -> bool {
+pub(crate) fn is_high_s(alg: &str, signature: &[u8]) -> bool {
     let order = order(alg);
     assert_eq!(signature.len(), 2 * order.len(), "R ‖ S of {alg}");
     signature[order.len()..] > half(&order)[..]
 }
 
 /// `R ‖ (n − S)`: the other valid signature over the same message.
-pub(super) fn twin(alg: &str, signature: &[u8]) -> Vec<u8> {
+pub(crate) fn twin(alg: &str, signature: &[u8]) -> Vec<u8> {
     let order = order(alg);
     let width = order.len();
     assert_eq!(signature.len(), 2 * width, "R ‖ S of {alg}");

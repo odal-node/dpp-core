@@ -3,8 +3,8 @@
 //!
 //! Tokens are forged: a genuine signature over a header or payload that
 //! `sign_credential` would never write, so a refusal can only be the check it names.
-//! The time claims are in `temporal_tests`, `iss` and the `kid` in `issuer_tests`, and
-//! the suite's inputs in `suite_tests`.
+//! The time claims are in `temporal.rs`, `iss` and the `kid` in `issuer.rs`, and
+//! the suite's inputs in `suite/verification.rs`.
 
 use serde_json::{Value, json};
 

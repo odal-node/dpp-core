@@ -70,7 +70,7 @@ fn the_published_jwk_names_itself_without_changing_its_thumbprint() {
 #[test]
 fn different_keys_have_different_thumbprints() {
     // The public key of RFC 8032 clause 7.1's TEST 2: another valid, published key.
-    let other = hex::decode(super::rfc8032::public_hex("TEST 2")).expect("hex");
+    let other = hex::decode(super::common::public_hex("TEST 2")).expect("hex");
 
     assert_ne!(ed(&public_key()).thumbprint(), ed(&other).thumbprint());
 }

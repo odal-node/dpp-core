@@ -4,7 +4,7 @@
 //! three are about the lookup that replaced the two by-GTIN methods.
 
 use super::super::port::PassportRepository;
-use super::port::{InMemoryRepo, fixture_identifier, identified_passport};
+use super::common::{InMemoryRepo, fixture_identifier, identified_passport};
 use crate::identifier::ProductIdentifier;
 use crate::status::PassportStatus;
 

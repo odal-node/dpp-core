@@ -6,7 +6,7 @@ use crate::catalog::ProductGroupCatalog;
 
 use crate::schemas::VersionedSchemaRegistry;
 
-use super::data::{minimal_battery_data, test_textile_data};
+use super::common::{minimal_battery_data, test_textile_data};
 
 // One schema-valid instance per product group, constructed through the *Rust type*
 // (not a hand-written JSON literal) and round-tripped through that product group's

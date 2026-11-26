@@ -1,6 +1,6 @@
 //! Time: `now` is explicit, and `exp` and `nbf` are read only under `Some(now)`.
 //!
-//! `iat` is never read and has its own test in `verify_tests`. The presentation's own
+//! `iat` is never read and has its own test in `verify.rs`. The presentation's own
 //! `exp`, and the one of each envelope, are held to the same `now`.
 
 use serde_json::{Value, json};

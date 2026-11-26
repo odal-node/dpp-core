@@ -1,7 +1,7 @@
 //! The W3C VC-JOSE-COSE test suite, rows 17 to 26: the SD-JWT issuance and verification
 //! inputs, under the keys the suite's mapping pairs them with.
 //!
-//! As in `suite_tests`, the harness's mapping is `Ok` for `success` and `Err` for
+//! As in `verification.rs`, the harness's mapping is `Ok` for `success` and `Err` for
 //! `failure`, and every failure row also asserts its own [`JoseError`] and that the
 //! signature is valid, so the refusal is provably the check it names. The suite's
 //! `--sd` paths are written here as the arrays `ClaimPath::from_json` reads, which is what

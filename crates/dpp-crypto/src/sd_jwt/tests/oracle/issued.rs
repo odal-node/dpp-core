@@ -3,14 +3,14 @@
 //!
 //! Each case is a claim tree and a set of paths to hide. The corpus holds the
 //! token with everything disclosed, and a token for each reachable presentation
-//! of it, with what a verifier must see worked out by [`super::plan::reveal`]
+//! of it, with what a verifier must see worked out by [`super::common::reveal`]
 //! and not by this crate.
 
 use std::collections::BTreeSet;
 
 use serde_json::{Map, Value, json};
 
-use super::plan::{Path, Rng, Seg, path, paths};
+use super::common::{Path, Rng, Seg, path, paths};
 
 pub(super) struct Case {
     pub(super) id: String,
@@ -24,17 +24,6 @@ fn case(id: &str, claims: Value, hidden: &[&[&str]]) -> Case {
         claims,
         hidden: paths(hidden),
     }
-}
-
-/// How a path reads in a case id or a failure: `address.region`, `nat.#1`.
-pub(super) fn show(p: &Path) -> String {
-    p.iter()
-        .map(|s| match s {
-            Seg::Key(k) => k.clone(),
-            Seg::Idx(i) => format!("#{i}"),
-        })
-        .collect::<Vec<_>>()
-        .join(".")
 }
 
 pub(super) fn cases() -> Vec<Case> {

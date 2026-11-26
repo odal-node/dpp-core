@@ -15,16 +15,16 @@ use crate::sd_jwt::{Disclosure, build_payload, conceal, conceal_elements};
 
 /// One step down a claim tree.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
-pub(super) enum Seg {
+pub(crate) enum Seg {
     Key(String),
     Idx(usize),
 }
 
-pub(super) type Path = Vec<Seg>;
+pub(crate) type Path = Vec<Seg>;
 
 /// A path as a test would say it: `&["address", "region"]`, and `#` marks an
 /// array index, so `&["nationalities", "#1"]` is the second nationality.
-pub(super) fn path(spec: &[&str]) -> Path {
+pub(crate) fn path(spec: &[&str]) -> Path {
     spec.iter()
         .map(|s| match s.strip_prefix('#') {
             Some(n) => Seg::Idx(n.parse().expect("an index after #")),
@@ -33,18 +33,18 @@ pub(super) fn path(spec: &[&str]) -> Path {
         .collect()
 }
 
-pub(super) fn paths(specs: &[&[&str]]) -> BTreeSet<Path> {
+pub(crate) fn paths(specs: &[&[&str]]) -> BTreeSet<Path> {
     specs.iter().map(|s| path(s)).collect()
 }
 
 /// A claim tree issued to a plan.
-pub(super) struct Issued {
+pub(crate) struct Issued {
     /// The JWT payload: digests and placeholders where claims were hidden, and
     /// `_sd_alg` when anything was.
-    pub(super) payload: Value,
-    pub(super) disclosures: Vec<Disclosure>,
+    pub(crate) payload: Value,
+    pub(crate) disclosures: Vec<Disclosure>,
     /// The digest of the Disclosure that hides each path.
-    pub(super) digest_at: BTreeMap<Path, String>,
+    pub(crate) digest_at: BTreeMap<Path, String>,
 }
 
 /// Issue `claims` so that exactly the paths in `hidden` are concealed.
@@ -52,7 +52,7 @@ pub(super) struct Issued {
 /// Children are processed before their parent, which is what makes a concealed
 /// object carry its own concealed members inside its Disclosure: RFC 9901
 /// section 6.3, the recursive structure.
-pub(super) fn issue_to_plan(claims: &Value, hidden: &BTreeSet<Path>) -> Issued {
+pub(crate) fn issue_to_plan(claims: &Value, hidden: &BTreeSet<Path>) -> Issued {
     let mut found: Vec<(Path, Disclosure)> = Vec::new();
     let mut at = Path::new();
     let top = match walk(claims, &mut at, hidden, &mut found) {
@@ -126,7 +126,7 @@ fn walk(
 /// An array loses the elements that are not presented, and the ones after them
 /// move up, because that is what RFC 9901 clause 7.1 step 3.d does with a
 /// placeholder nobody holds a Disclosure for.
-pub(super) fn reveal(claims: &Value, hidden: &BTreeSet<Path>, presented: &BTreeSet<Path>) -> Value {
+pub(crate) fn reveal(claims: &Value, hidden: &BTreeSet<Path>, presented: &BTreeSet<Path>) -> Value {
     fn go(
         value: &Value,
         at: &mut Path,
@@ -166,7 +166,7 @@ pub(super) fn reveal(claims: &Value, hidden: &BTreeSet<Path>, presented: &BTreeS
 /// Whether a holder can present exactly `presented`: a Disclosure for something
 /// inside a hidden object is useless unless the object's own is presented too,
 /// and a token that carried it anyway would carry an unreferenced Disclosure.
-pub(super) fn reachable(hidden: &BTreeSet<Path>, presented: &BTreeSet<Path>) -> bool {
+pub(crate) fn reachable(hidden: &BTreeSet<Path>, presented: &BTreeSet<Path>) -> bool {
     presented.iter().all(|p| {
         (1..p.len()).all(|n| {
             let ancestor = &p[..n];
@@ -176,7 +176,7 @@ pub(super) fn reachable(hidden: &BTreeSet<Path>, presented: &BTreeSet<Path>) -> 
 }
 
 /// Every reachable set of presented paths, for a plan small enough to list.
-pub(super) fn every_presentation(hidden: &BTreeSet<Path>) -> Vec<BTreeSet<Path>> {
+pub(crate) fn every_presentation(hidden: &BTreeSet<Path>) -> Vec<BTreeSet<Path>> {
     assert!(hidden.len() <= 12, "too many hidden paths to enumerate");
     let all: Vec<&Path> = hidden.iter().collect();
     (0u32..(1 << all.len()))
@@ -196,10 +196,10 @@ pub(super) fn every_presentation(hidden: &BTreeSet<Path>) -> Vec<BTreeSet<Path>>
 /// Written out because the corpus has to be made of the same cases on every
 /// machine and in every run, so a failure in CI can be reproduced from the case
 /// id alone. The bytes differ between runs, since salts are random.
-pub(super) struct Rng(pub(super) u64);
+pub(crate) struct Rng(pub(crate) u64);
 
 impl Rng {
-    pub(super) fn next(&mut self) -> u64 {
+    pub(crate) fn next(&mut self) -> u64 {
         self.0 = self.0.wrapping_add(0x9E37_79B9_7F4A_7C15);
         let mut z = self.0;
         z = (z ^ (z >> 30)).wrapping_mul(0xBF58_476D_1CE4_E5B9);
@@ -208,18 +208,18 @@ impl Rng {
     }
 
     /// A number in `0..n`.
-    pub(super) fn below(&mut self, n: u64) -> u64 {
+    pub(crate) fn below(&mut self, n: u64) -> u64 {
         self.next() % n
     }
 
-    pub(super) fn chance(&mut self, percent: u64) -> bool {
+    pub(crate) fn chance(&mut self, percent: u64) -> bool {
         self.below(100) < percent
     }
 }
 
 /// Distinct reachable presentations drawn at random, for a plan too large to
 /// list: nothing, everything, and up to `count` others.
-pub(super) fn sampled_presentations(
+pub(crate) fn sampled_presentations(
     hidden: &BTreeSet<Path>,
     rng: &mut Rng,
     count: usize,
@@ -238,4 +238,15 @@ pub(super) fn sampled_presentations(
         }
     }
     seen.into_iter().collect()
+}
+
+/// How a path reads in a case id or a failure: `address.region`, `nat.#1`.
+pub(crate) fn show(p: &Path) -> String {
+    p.iter()
+        .map(|s| match s {
+            Seg::Key(k) => k.clone(),
+            Seg::Idx(i) => format!("#{i}"),
+        })
+        .collect::<Vec<_>>()
+        .join(".")
 }

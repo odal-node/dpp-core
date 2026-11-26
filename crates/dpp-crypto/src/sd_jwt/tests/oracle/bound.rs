@@ -12,19 +12,10 @@ use serde_json::{Map, Value, json};
 
 use crate::jws::signer::sign_with_header;
 use crate::keystore::KeyEntry;
-use crate::sd_jwt::{KeyBinding, KeyBindingPolicy, SdJwt, digest_of, holder_key_confirmation};
+use crate::sd_jwt::{KeyBinding, SdJwt, digest_of, holder_key_confirmation};
 
-use super::plan::{issue_to_plan, path, paths};
-use super::signing::{Issuer, holder};
+use super::common::{AUDIENCE, Issuer, NONCE, holder, issue_to_plan, path, paths};
 
-/// The Verifier every case is for.
-pub(super) const AUDIENCE: &str = "https://verifier.example";
-/// The challenge every case answers.
-pub(super) const NONCE: &str = "n-2RsH_0kQ8vLz";
-/// How far `iat` may lie from now either way, in seconds. One number for both
-/// directions, because one of the other implementations takes its window as a
-/// point and a symmetric skew.
-pub(super) const WINDOW: u32 = 300;
 /// Far enough outside the window that no clock a judge reads can bring it back.
 const FAR: i64 = 3600;
 
@@ -37,17 +28,6 @@ pub(super) struct Bound {
     /// The clause of RFC 9901 the case turns on.
     pub(super) clause: &'static str,
     pub(super) token: String,
-}
-
-/// The policy a Verifier holds every case to, at `now`.
-pub(super) fn policy(now: i64) -> KeyBindingPolicy {
-    KeyBindingPolicy {
-        audience: AUDIENCE.to_owned(),
-        nonce: NONCE.to_owned(),
-        now,
-        max_age: WINDOW,
-        leeway: WINDOW,
-    }
 }
 
 /// A credential issued to the Holder whose `cnf` is given, hiding a name, a

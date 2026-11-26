@@ -5,23 +5,7 @@ use chrono::{Duration, Utc};
 use crate::status_list::StatusList;
 
 use super::super::*;
-
-fn sample_subject() -> DppCredentialSubject {
-    DppCredentialSubject {
-        id: "did:web:repair-shop.example.com".into(),
-        name: "GreenFix Textile Repair".into(),
-        role: CredentialRole::AuthorisedRepairer,
-        country: "DE".into(),
-        product_groups: vec!["textile".into()],
-        product_categories: vec![],
-    }
-}
-
-pub(super) fn sample_credential() -> DppAccessCredential {
-    CredentialBuilder::new("did:web:authority.example.com".into(), sample_subject())
-        .expires_in_days(365)
-        .build()
-}
+use super::common::{credential_with_status_index, sample_credential, sample_subject};
 
 #[test]
 fn credential_builder_sets_required_fields() {
@@ -143,18 +127,6 @@ fn vc2_uses_valid_from_until_not_issuance_expiration() {
 }
 
 // ── Revocation ─────────────────────────────────────────────
-
-pub(super) fn credential_with_status_index(index: &str) -> DppAccessCredential {
-    CredentialBuilder::new("did:web:authority.example.com".into(), sample_subject())
-        .with_status(CredentialStatus {
-            id: format!("https://authority.example.com/status/1#{index}"),
-            status_type: "BitstringStatusListEntry".into(),
-            status_purpose: "revocation".into(),
-            status_list_index: Some(index.to_owned()),
-            status_list_credential: Some("https://authority.example.com/status/1".into()),
-        })
-        .build()
-}
 
 #[test]
 fn revoked_credential_is_detected() {
