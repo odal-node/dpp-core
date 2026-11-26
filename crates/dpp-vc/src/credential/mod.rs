@@ -37,6 +37,8 @@ mod jwt_reason_tests;
 mod jwt_tests;
 mod revocation;
 #[cfg(test)]
+mod revocation_result_tests;
+#[cfg(test)]
 mod revocation_tests;
 #[cfg(test)]
 mod tests;
