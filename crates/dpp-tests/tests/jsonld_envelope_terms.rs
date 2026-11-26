@@ -197,3 +197,27 @@ fn members_whose_keys_are_data_are_json_literals() {
         json!({ "@id": "dpp:complianceResult.receipt", "@type": "@json" })
     );
 }
+
+/// The walker reads every element of an array, not only the first. A key that only a
+/// later element carries is reported missing and listed among the document's paths.
+///
+/// Negative control for `jsonld_support/lockstep.rs`: the first element has its term,
+/// so a walk that stopped at the first element would report nothing.
+#[test]
+fn lockstep_reads_every_element_of_an_array() {
+    let document = json!({ "items": [{ "a": 1 }, { "b": 2 }] });
+    let scope = json!({ "items": { "@id": "dpp:items", "@context": { "a": "dpp:a" } } });
+    let document = document.as_object().expect("the document is an object");
+    let scope = scope.as_object().expect("the scope is an object");
+
+    let mut missing = Vec::new();
+    missing_terms(document, scope, "", &mut missing);
+    assert_eq!(missing, ["items.b"]);
+
+    let mut paths = BTreeSet::new();
+    document_paths(document, "", &mut paths);
+    assert!(
+        paths.contains("items.a") && paths.contains("items.b"),
+        "every element's keys are paths: {paths:?}"
+    );
+}

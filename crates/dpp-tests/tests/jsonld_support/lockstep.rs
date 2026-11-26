@@ -12,12 +12,21 @@ use std::collections::BTreeSet;
 
 use serde_json::{Map, Value};
 
-/// The members of a value that is, or holds, an object.
-pub fn members_of(value: &Value) -> Option<&Map<String, Value>> {
+/// Every object a value is, or holds: the value itself when it is an object, and for
+/// an array, every object element, recursing into nested arrays. Any other value
+/// holds none.
+pub fn objects_of(value: &Value) -> Vec<&Map<String, Value>> {
     match value {
-        Value::Object(object) => Some(object),
-        Value::Array(items) => items.iter().find_map(members_of),
-        _ => None,
+        Value::Object(object) => vec![object],
+        Value::Array(items) => items.iter().flat_map(objects_of).collect(),
+        _ => Vec::new(),
+    }
+}
+
+/// Report a missing path once, however many array elements repeat it.
+fn report(out: &mut Vec<String>, path: String) {
+    if !out.contains(&path) {
+        out.push(path);
     }
 }
 
@@ -33,6 +42,10 @@ fn is_literal(definition: &Value) -> bool {
 /// A key with members must be defined with a scoped context of its own, because
 /// the scope above it does not propagate; one without need only be defined. A key
 /// typed `@json` is not descended into.
+///
+/// Every object a key holds is walked, array elements included, so a key that only a
+/// later element carries is reported. A path that several elements repeat is
+/// reported once.
 pub fn missing_terms(
     document: &Map<String, Value>,
     scope: &Map<String, Value>,
@@ -46,18 +59,19 @@ pub fn missing_terms(
             format!("{path}.{key}")
         };
         let Some(definition) = scope.get(key) else {
-            out.push(here);
+            report(out, here);
             continue;
         };
         if is_literal(definition) {
             continue;
         }
-        if let Some(members) = members_of(value) {
+        for members in objects_of(value) {
             match definition.get("@context").and_then(Value::as_object) {
                 Some(inner) => missing_terms(members, inner, &here, out),
-                None => out.push(format!(
-                    "{here} (defined, but with no scope for its members)"
-                )),
+                None => report(
+                    out,
+                    format!("{here} (defined, but with no scope for its members)"),
+                ),
             }
         }
     }
@@ -81,7 +95,9 @@ pub fn scope_paths(scope: &Map<String, Value>, prefix: &str, out: &mut BTreeSet<
     }
 }
 
-/// The path of every key a document carries, as a dotted string.
+/// The path of every key a document carries, as a dotted string. Every object a key
+/// holds is walked, array elements included, so a key that only a later element
+/// carries is listed too.
 pub fn document_paths(document: &Map<String, Value>, prefix: &str, out: &mut BTreeSet<String>) {
     for (key, value) in document {
         let path = if prefix.is_empty() {
@@ -90,7 +106,7 @@ pub fn document_paths(document: &Map<String, Value>, prefix: &str, out: &mut BTr
             format!("{prefix}.{key}")
         };
         out.insert(path.clone());
-        if let Some(members) = members_of(value) {
+        for members in objects_of(value) {
             document_paths(members, &path, out);
         }
     }
