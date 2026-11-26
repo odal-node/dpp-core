@@ -29,7 +29,7 @@ mod lockstep;
 #[path = "jsonld_support/schema_instance.rs"]
 mod schema_instance;
 
-use lockstep::{document_paths, members_of, missing_terms, scope_paths};
+use lockstep::{document_paths, missing_terms, scope_paths};
 use schema_instance::full_instance;
 
 /// The inline term map of the passport context.
@@ -97,7 +97,9 @@ fn every_field_of_every_schema_has_a_term_at_its_position() {
         if let Some(identifier) = document.remove("productIdentifier") {
             let mut missing = Vec::new();
             missing_terms(
-                members_of(&identifier).expect("the product identifier has members"),
+                identifier
+                    .as_object()
+                    .expect("the product identifier is an object"),
                 &identifier_scope,
                 "productIdentifier",
                 &mut missing,
