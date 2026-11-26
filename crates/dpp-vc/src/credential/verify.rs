@@ -18,10 +18,19 @@ pub enum VerificationResult {
     },
     /// Credential has expired.
     Expired { expired_at: DateTime<Utc> },
+    /// The credential's `validFrom` is later than `now`; the mirror of `Expired`.
+    NotYetValid { valid_from: DateTime<Utc> },
     /// JWS signature is invalid or cannot be verified.
     InvalidSignature(String),
-    /// Credential has been revoked.
+    /// The status bit is set, so the issuer has revoked the credential.
     Revoked,
+    /// The credential declares a revocation status that could not be answered:
+    /// no status list was supplied, or the list supplied cannot answer for its
+    /// entry (the entry's `statusPurpose` is not `revocation`, or its index is
+    /// missing, not a number, or out of range). It is not valid: a caller
+    /// refuses it exactly as it refuses `Revoked`, and can now tell an
+    /// unavailable list from a revocation.
+    RevocationIndeterminate,
     /// Credential is structurally invalid (missing fields, wrong type).
     MalformedCredential(String),
     /// The credential's scope doesn't cover the requested resource.
@@ -65,9 +74,9 @@ pub fn verify_credential_claims(
     }
 
     if now < credential.valid_from {
-        return VerificationResult::MalformedCredential(
-            "Credential issuance date is in the future".into(),
-        );
+        return VerificationResult::NotYetValid {
+            valid_from: credential.valid_from,
+        };
     }
 
     if let Some(product_group) = required_product_group {
@@ -101,7 +110,8 @@ pub fn verify_credential_claims(
 /// fetch **or** the fetch failed.
 ///
 /// **Fail-closed:** a credential that *declares* a revocation status whose list
-/// is unavailable or unresolvable is treated as `Revoked`.
+/// is unavailable, or cannot answer for its entry, is `RevocationIndeterminate`,
+/// which is not valid. Only a set status bit is `Revoked`.
 pub fn verify_credential_with_revocation(
     credential: &DppAccessCredential,
     required_product_group: Option<&str>,
@@ -117,7 +127,8 @@ pub fn verify_credential_with_revocation(
 
 /// Apply the fail-closed revocation check on top of an already-`Valid` `base`
 /// result: no declared status → pass `base` through unchanged; a declared
-/// status whose list is unresolvable or revoking → `Revoked`. Shared by
+/// status with no list, or a list that cannot answer for its entry →
+/// `RevocationIndeterminate`; a set bit → `Revoked`. Shared by
 /// [`verify_credential_with_revocation`] and
 /// [`verify_credential_with_revocation_and_trust`], which differ only in the
 /// claims check performed before this point.
@@ -130,12 +141,11 @@ fn apply_revocation_check(
         return base;
     }
     match status_list {
-        None => VerificationResult::Revoked,
+        None => VerificationResult::RevocationIndeterminate,
         Some(list) => match check_revocation(credential, list) {
             RevocationOutcome::NotRevoked => base,
-            RevocationOutcome::Revoked | RevocationOutcome::Indeterminate => {
-                VerificationResult::Revoked
-            }
+            RevocationOutcome::Revoked => VerificationResult::Revoked,
+            RevocationOutcome::Indeterminate => VerificationResult::RevocationIndeterminate,
         },
     }
 }

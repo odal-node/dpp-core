@@ -4,7 +4,7 @@
 //! finding into a cross-crate verifiable assertion. Scenarios covered:
 //!
 //! - **Revocation denied (fail-closed)**: credential with status bit SET → Revoked;
-//!   status list unavailable → Revoked (never fail-open).
+//!   status list unavailable → RevocationIndeterminate (never fail-open).
 //! - **Forged-issuer rejected**: `StaticTrustedIssuers` blocks untrusted issuer DID.
 //! - **Content-binding tamper rejected**: JWS signed over canonical payload A cannot
 //!   be presented with payload B — swapping the payload segment fails verification.
@@ -92,7 +92,7 @@ fn revoked_credential_denied() {
 /// This is the fail-closed property: if revocation status is unresolvable,
 /// the credential MUST NOT grant access.
 #[test]
-fn revoked_credential_fail_closed_when_list_unavailable() {
+fn unanswerable_status_fails_closed_when_list_unavailable() {
     let credential = credential_with_status_at_index("5");
 
     // `None` simulates a status-list fetch failure (network error, timeout, etc.).
@@ -100,8 +100,8 @@ fn revoked_credential_fail_closed_when_list_unavailable() {
 
     assert_eq!(
         result,
-        VerificationResult::Revoked,
-        "unavailable status list must fail closed (Revoked), not grant access"
+        VerificationResult::RevocationIndeterminate,
+        "unavailable status list must fail closed (RevocationIndeterminate), not grant access"
     );
 }
 
