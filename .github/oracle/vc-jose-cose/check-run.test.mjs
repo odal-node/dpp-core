@@ -3,7 +3,7 @@
 // `report.json` and the `tests/output` files of the rows that ran. It runs check-run.mjs
 // there as a child process and checks the exit status and the message.
 //
-//   SUITE_ROOT=target/vc-jose-cose-test-suite node --test w3c-suites/vc-jose-cose/check-run.test.mjs
+//   SUITE_ROOT=target/vc-jose-cose-test-suite node --test .github/oracle/vc-jose-cose/check-run.test.mjs
 
 import {after, test} from 'node:test';
 import assert from 'node:assert/strict';

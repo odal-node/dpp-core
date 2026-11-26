@@ -548,8 +548,8 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
 - **The minimum supported Rust version is 1.100, from 1.99.** The toolchain this
   repository builds and tests with moves to 1.100.0, the latest stable release,
   and `rust-version` follows it, so CI still enforces the floor every crate's
-  README states. The W3C `vc-jose-cose` harness image builds on
-  `rust:1.100.0-slim-bookworm`.
+  README states. The W3C `vc-jose-cose` harness is a binary of the unpublished
+  `dpp-tests` crate, so it builds with the same toolchain as the workspace.
 
 - **A verifier no longer holds the `kid` to an absolute URL when there is no `iss`.**
   VC-JOSE-COSE §4.2 opens "When using controlled identifier documents with this

@@ -1,0 +1,43 @@
+# Replaces `implementations/compose.yml` of the suite checkout before the run.
+#
+# The suite starts every row with `docker compose -f ./implementations/compose.yml
+# run --rm <name> ...`, and has no other way to be pointed at a different file. Its
+# own file lists the services of other implementations, most of them images pulled
+# from other people's registries. This one lists ours alone, so no other
+# implementation can start.
+#
+# The service name is the implementation's `name` in `localConfig.cjs`.
+#
+# Nothing is built into an image. The harness is the `vc-jose-cose-suite` binary of
+# `dpp-tests`, built beforehand with `cargo build -p dpp-tests --bin
+# vc-jose-cose-suite`, and `SUITE_HARNESS` is the absolute path of that binary. It is
+# bind-mounted read-only into a stock base image that holds nothing but glibc and
+# the C runtime, with no shell and no package manager.
+#
+# What replaces `pull_policy: never`. There is no image of ours to refuse to pull
+# any more, so the base image is pulled when it is absent (`missing`, the default),
+# and the digest after its tag is what pins it: a registry cannot answer a pull of
+# a digest with other bytes, so what runs is the image that was read when the digest
+# was written down, and moving it is a deliberate edit with a visible diff. Dependabot
+# does not watch it. The tag in front of the digest says what was pinned.
+#
+# Why Debian 13. The binary is built on the runner (`ubuntu-latest`, glibc 2.39) and
+# is dynamically linked, so the base image needs a glibc at least as new as the
+# build host's. Distroless `cc-debian12` has 2.36 and is not enough; `cc-debian13`
+# has 2.41.
+services:
+  dpp-vc:
+    image: gcr.io/distroless/cc-debian13:nonroot@sha256:532c7a94f9e96ba9db75eb9388f4227751131c7cb0a411d1a8521af4096135de
+    pull_policy: missing
+    entrypoint: ["/usr/local/bin/vc-jose-cose-suite"]
+    # The suite's `tests/` directory is bind-mounted and belongs to whoever ran the
+    # suite, and the verdict is written into it. The workflow passes its own ids. The
+    # base image's own user (65532) is the default, and cannot write into a directory
+    # that another user owns.
+    user: "${SUITE_UID:-65532}:${SUITE_GID:-65532}"
+    volumes:
+      - type: bind
+        source: ${SUITE_HARNESS:?SUITE_HARNESS must be the absolute path of the vc-jose-cose-suite binary}
+        target: /usr/local/bin/vc-jose-cose-suite
+        read_only: true
+      - ../tests:/tests

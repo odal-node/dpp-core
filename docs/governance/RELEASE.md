@@ -81,13 +81,13 @@ Before running `cargo release`:
    not. It sees only what is pinned, which is why a test requires every `verified` record
    to pin something.
 9. **Plugin version.** `plugins/Cargo.toml`'s `[workspace.package] version` must equal the
-   workspace's, and the lockfiles of `plugins/`, `fuzz/` and `w3c-suites/vc-jose-cose/` must agree (`just lock-check`).
+   workspace's, and the lockfiles of `plugins/` and `fuzz/` must agree (`just lock-check`).
    `cargo release` does both, through a replacement and a hook in
    `crates/dpp-tests/Cargo.toml`, because those are separate workspaces it does not
    otherwise see. Check that the dry run shows `Replacing in ../../plugins/Cargo.toml` with
    the version you mean to ship, and the `relock` hook's dry-run line. The lockfiles move
    only on `--execute`, where the release commit names `plugins/Cargo.toml`,
-   `plugins/Cargo.lock`, `fuzz/Cargo.lock` and `w3c-suites/vc-jose-cose/Cargo.lock`. When the version bump comes in on a feature
+   `plugins/Cargo.lock` and `fuzz/Cargo.lock`. When the version bump comes in on a feature
    pull request, that pull request does the same by hand: edit the line and run
    `just relock`.
 10. **A consumer passes against this commit.** A published crate cannot be taken back: a

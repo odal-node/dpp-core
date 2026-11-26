@@ -2,16 +2,17 @@
 
 The command line that the W3C's
 [VC-JOSE-COSE test suite](https://github.com/w3c/vc-jose-cose-test-suite) runs against
-`dpp-vc`, the image it is built into, and the check that holds a run of the suite to what
+`dpp-vc`, the container it runs in, and the check that holds a run of the suite to what
 this crate implements.
 
 **No conformance is claimed.** A green run says that `dpp-vc` gives the verdict the
 suite expects on each row it ran. The suite is not the specification, and
 `docs/architecture/STANDARDS.md` is the one place that says whether a claim is made.
 
-This is a standalone crate with its own `[workspace]` and lockfile, like `fuzz/`, so
-`cargo build --workspace` at the repository root neither builds it nor needs Node or
-Docker. It takes `dpp-vc` and `dpp-crypto` by path and calls only their public API.
+The command line is the `vc-jose-cose-suite` binary of `dpp-tests`, an unpublished member of
+the root workspace, in `crates/dpp-tests/src/bin/vc_jose_cose_suite/`. `cargo build --workspace`
+builds it and needs neither Node nor Docker; only running the suite does. It takes `dpp-vc` and
+`dpp-crypto` by path and calls only their public API.
 
 ## What the suite calls
 
@@ -62,7 +63,7 @@ stderr. The process then exits 0: a refusal is the right answer to a row that ex
   at issuance, which is what row 5 expects.
 - **The paths.** `--sd` is a JSON array of the suite's dotted paths, with `[n]` for one
   array element: `credentialSubject.phoneNumbers[0]`. The harness turns each into the
-  library's `ClaimPath` (`src/paths.rs`), because the library has no string syntax of its
+  library's `ClaimPath` (`crates/dpp-tests/src/bin/vc_jose_cose_suite/paths.rs`), because the library has no string syntax of its
   own. A path that is not in that syntax is an unusable input, not a verdict, and so is
   `--sd` given to a verification or to a JOSE feature, even as `[]`. An SD-JWT issuance
   without `--sd` conceals nothing.
@@ -118,8 +119,11 @@ implementations it names run. All six features are on: `credential_jose`,
 `.github/workflows/vc-jose-cose-suite.yml` runs on every pull request and every push to
 `main`, and is not path-filtered. In order, it:
 
-1. formats, lints and tests this crate, which no other job reaches;
-2. builds the image from the checkout, `vc-jose-cose-suite:local`;
+1. formats, lints and tests the harness: `cargo fmt --check -p dpp-tests`, `cargo clippy
+   --locked -p dpp-tests --all-targets -- -D warnings`, and `cargo test --locked -p
+   dpp-tests --bin vc-jose-cose-suite --test vc_jose_cose_suite_usage_error`;
+2. builds the harness on the runner, `cargo build --locked -p dpp-tests --bin
+   vc-jose-cose-suite`;
 3. checks out the suite at the commit named in the workflow's `SUITE_COMMIT`, the one
    place that names it, and installs it with `npm ci --ignore-scripts`;
 4. runs the checker's own tests, `check-run.test.mjs`, against the suite's
@@ -127,7 +131,8 @@ implementations it names run. All six features are on: `credential_jose`,
    runs `check-run.mjs` in it, and the step fails if any case gets the wrong exit status
    or message;
 5. replaces the suite's `implementations/compose.yml` with `compose.yml`, which lists
-   only this implementation and never pulls an image, and adds `localConfig.cjs`;
+   only this implementation and runs the binary in a stock base image pinned by digest,
+   and adds `localConfig.cjs`, then pulls that base image;
 6. runs the suite with mocha's `json` reporter;
 7. runs `check-run.mjs` on that report.
 
@@ -154,10 +159,14 @@ suite's own table. Today that is 35 of 35, and nothing here says so.
 
 ## Run it locally
 
-Docker and Node 24 are needed: the suite's own mocha does not start under Node 26. From the repository root:
+Docker and Node 24 are needed: the suite's own mocha does not start under Node 26. The
+harness is built on the host and mounted into a Linux container (`compose.yml`), so this
+runs on Linux only, with a glibc no newer than the image's (Debian 13, glibc 2.41). On
+another system the container cannot execute the binary. From the repository root:
 
 ```bash
-docker build --file w3c-suites/vc-jose-cose/Dockerfile --tag vc-jose-cose-suite:local .
+cargo build --locked -p dpp-tests --bin vc-jose-cose-suite
+export SUITE_HARNESS="$PWD/target/debug/vc-jose-cose-suite"
 
 suite=target/vc-jose-cose-test-suite
 commit=$(sed -n 's/^  SUITE_COMMIT: //p' .github/workflows/vc-jose-cose-suite.yml)
@@ -166,13 +175,13 @@ git -C "$suite" fetch --depth 1 https://github.com/w3c/vc-jose-cose-test-suite.g
 git -C "$suite" checkout FETCH_HEAD
 (cd "$suite" && npm ci --ignore-scripts --no-audit --no-fund)
 
-cp w3c-suites/vc-jose-cose/localConfig.cjs "$suite/localConfig.cjs"
-cp w3c-suites/vc-jose-cose/compose.yml "$suite/implementations/compose.yml"
+cp .github/oracle/vc-jose-cose/localConfig.cjs "$suite/localConfig.cjs"
+cp .github/oracle/vc-jose-cose/compose.yml "$suite/implementations/compose.yml"
 rm -f "$suite"/tests/output/*.json
 
 (cd "$suite" && SUITE_UID="$(id -u)" SUITE_GID="$(id -g)" npx mocha tests/ \
   --reporter json --reporter-option output=report.json --timeout 150000 --preserve-symlinks)
-(cd "$suite" && node ../../w3c-suites/vc-jose-cose/check-run.mjs report.json)
+(cd "$suite" && node ../../.github/oracle/vc-jose-cose/check-run.mjs report.json)
 ```
 
 The last command prints each row's verdict beside the one the suite
@@ -181,32 +190,38 @@ expects, with a refusal's reason, and the rows skipped. `target/` is ignored by 
 To run the harness by hand:
 
 ```bash
-cd w3c-suites/vc-jose-cose
-cargo test --locked
-cargo run --locked -- verify --input in.txt --key vm-p256.json \
-  --feature credential_jose --output out.json
+cargo test --locked -p dpp-tests --bin vc-jose-cose-suite --test vc_jose_cose_suite_usage_error
+cargo run --locked -p dpp-tests --bin vc-jose-cose-suite -- verify --input in.txt \
+  --key vm-p256.json --feature credential_jose --output out.json
 ```
 
-## The image
+## The container
 
-A multi-stage build whose context is the repository root, with both base images pinned
-by digest: the toolchain `rust-toolchain.toml` pins to build, and Distroless `cc` to run,
-which has no shell and no package manager. The entrypoint is the harness binary, and it
-runs as user 65532.
+There is no image to build. `compose.yml` runs the binary the build above wrote,
+bind-mounted read-only at `/usr/local/bin/vc-jose-cose-suite` of a stock base image,
+Distroless `cc` on Debian 13, which holds glibc and the C runtime and has no shell and no
+package manager. `SUITE_HARNESS` is the absolute path of the binary, and the compose file
+refuses to start without it. The base image is named by its digest, so the bytes it starts
+from are the bytes that were read, and Dependabot does not watch it: moving it is a
+deliberate edit, with the tag and the digest changed together. The binary is dynamically
+linked, so the base image needs a glibc at least as new as the machine that built it; the
+runner's is 2.39 and this image's is 2.41. A Debian 12 base, whose glibc is 2.36, is not
+enough.
 
 The suite bind-mounts its `tests/` directory at `/tests`, and the verdict is written
-there. Run as 65532, the harness cannot write into a directory that another user owns, and
-it says so (`cannot write /tests/output/...: Permission denied`) and exits 2. Whoever
-runs the image runs it as the user that owns the directory, with `docker run --user` or
-`user:` in a compose file as `compose.yml` does, or makes `tests/output` writable.
+there. Run as the base image's own user (65532), the harness cannot write into a directory
+that another user owns, and it says so (`cannot write /tests/output/...: Permission denied`)
+and exits 2. Whoever runs it runs it as the user that owns the directory, with `user:` in
+the compose file as `compose.yml` does with `SUITE_UID` and `SUITE_GID`, or makes
+`tests/output` writable.
 
 ## Files
 
 | File | What it is |
 |---|---|
-| `src/` | The harness: argument parsing, the feature list, the two commands, and their tests |
+| `crates/dpp-tests/src/bin/vc_jose_cose_suite/` | The harness: argument parsing, the feature list, the two commands, and their tests |
+| `crates/dpp-tests/tests/vc_jose_cose_suite_usage_error.rs` | A usage error leaves no verdict behind: the binary run as the suite runs it |
 | `localConfig.cjs` | The manifest that registers the implementation, and the features on |
-| `compose.yml` | Replaces the suite's compose file, with this implementation alone |
+| `compose.yml` | Replaces the suite's compose file, with this implementation alone, run in a stock base image |
 | `check-run.mjs` | The strict reading of a run |
 | `check-run.test.mjs` | The checker's own tests, run by `node --test` |
-| `Dockerfile`, `Dockerfile.dockerignore` | The image, and the paths its build may read |

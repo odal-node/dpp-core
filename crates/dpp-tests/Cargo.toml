@@ -9,10 +9,10 @@ repository.workspace  = true
 rust-version.workspace = true
 publish = false
 
-# `plugins/`, `fuzz/` and `w3c-suites/vc-jose-cose/` are separate workspaces, so
-# cargo-release never sees them. This crate carries the two steps that keep them
-# in lockstep (`plugin_version_lockstep.rs`, `just lock-check`): move the plugins'
-# version, then re-resolve every lockfile against it. It is one crate so each runs once.
+# `plugins/` and `fuzz/` are separate workspaces, so cargo-release never sees
+# them. This crate carries the two steps that keep them in lockstep
+# (`plugin_version_lockstep.rs`, `just lock-check`): move the plugins' version, then
+# re-resolve every lockfile against it. It is one crate so each runs once.
 # The hook first refuses a checkout that is not origin's main
 # (`scripts/release-head-check.sh`), before anything is published.
 [package.metadata.release]
@@ -25,6 +25,15 @@ pre-release-hook = ["just", "pre-release"]
 name = "dpp_tests"
 path = "src/lib.rs"
 
+# The command line the W3C VC-JOSE-COSE test suite runs against `dpp-vc`. The suite
+# workflow builds it on the runner and `.github/oracle/vc-jose-cose/compose.yml` runs
+# it in a container; it calls only the public API of `dpp-vc` and `dpp-crypto`. Its
+# checker, its manifest of enabled features and its README are in
+# `.github/oracle/vc-jose-cose/`.
+[[bin]]
+name = "vc-jose-cose-suite"
+path = "src/bin/vc_jose_cose_suite/main.rs"
+
 # The library hosts shared test fixtures (see `src/fixtures.rs`) consumed by
 # the integration tests below, so its own core-crate dependencies are real
 # (not dev-only) dependencies.
@@ -35,6 +44,9 @@ dpp-vc     = { workspace = true }
 chrono     = { workspace = true }
 # The fixtures that build a passport's wire form (`schema_compat_fixture`, `passport_with`).
 serde_json = { workspace = true }
+# The `vc-jose-cose-suite` binary reads and writes a COSE message as base64 text, and a
+# binary is not built with dev-dependencies.
+base64     = { workspace = true }
 
 # Integration tests in `tests/` exercise multiple core crates together
 # (domain + crypto + gs1), so they live in a dedicated member crate rather
@@ -56,7 +68,6 @@ async-trait = { workspace = true }
 tokio      = { version = "1.40", features = ["macros", "rt"] }
 uuid       = { workspace = true }
 semver     = { workspace = true }
-base64     = { workspace = true }
 jsonschema = { workspace = true }
 # `jades_annex_b_schemas` and `json_schema_draft07` check the vendored ETSI
 # schema files and the vendored suite files against the SHA-256s recorded in

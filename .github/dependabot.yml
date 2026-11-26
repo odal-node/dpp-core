@@ -9,8 +9,7 @@ updates:
   # Workspace members live under "/"; the product-group plugins are separate crates
   # excluded from the workspace (see Cargo.toml `exclude`), so list them too.
   #
-  # `/fuzz` is a third workspace with its own lockfile and was watched by nothing;
-  # `/w3c-suites/vc-jose-cose` is a fourth.
+  # `/fuzz` is a third workspace with its own lockfile and was watched by nothing.
   # 🚨 Watching it does not stop a manifest bump from stranding its lockfile: a
   # bump of a version in a `Cargo.toml` leaves the lockfile unsatisfiable under
   # `--locked`, where a bump of the lockfile alone does not. `lock-check` then
@@ -26,7 +25,6 @@ updates:
       - "/"
       - "/plugins/*"
       - "/fuzz"
-      - "/w3c-suites/vc-jose-cose"
     schedule:
       interval: weekly
       day: monday

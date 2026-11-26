@@ -189,23 +189,23 @@ jobs:
       # it still pinned the workspace crates at 0.10.0.
       - name: Lockfiles match their manifests
         run: |
-          for ws in . plugins fuzz w3c-suites/vc-jose-cose; do
+          for ws in . plugins fuzz; do
             (cd "$ws" && cargo metadata --locked --format-version 1 > /dev/null) || {
               echo "::error::$ws/Cargo.lock does not match $ws/Cargo.toml. Run 'just lock-regen' and commit the lockfile."
               exit 1
             }
           done
-      # All four lockfiles, matching `just audit`. `plugins/`, `fuzz/` and
-      # `w3c-suites/vc-jose-cose/` are their own workspaces, so a scan of the root reads neither of them; they
-      # had only the `--locked` check above, which proves a lockfile matches its
-      # manifest and says nothing about advisories. Every workspace is scanned
-      # before the step fails, so one run names every finding.
+      # All three lockfiles, matching `just audit`. `plugins/` and `fuzz/` are their own
+      # workspaces, so a scan of the root reads neither of them; they had only the
+      # `--locked` check above, which proves a lockfile matches its manifest and says
+      # nothing about advisories. Every workspace is scanned before the step fails, so one
+      # run names every finding.
       - name: Install cargo-audit
         run: cargo install cargo-audit --locked
       - name: cargo audit
         run: |
           rc=0
-          for ws in . plugins fuzz w3c-suites/vc-jose-cose; do
+          for ws in . plugins fuzz; do
             echo "::group::$ws"
             cargo audit -f "$ws/Cargo.lock" --deny yanked || rc=1
             echo "::endgroup::"
@@ -230,7 +230,7 @@ jobs:
       - name: cargo deny
         run: |
           rc=0
-          for ws in . plugins fuzz w3c-suites/vc-jose-cose; do
+          for ws in . plugins fuzz; do
             echo "::group::$ws"
             cargo deny --manifest-path "$ws/Cargo.toml" check bans licenses sources || rc=1
             echo "::endgroup::"
