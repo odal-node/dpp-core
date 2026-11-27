@@ -214,7 +214,7 @@ public final class JsonLdJvmOracle {
         // Titanium rejects identical protected terms repeated by layered contexts.
         // Inline only hash-verified fixtures and remove only exact duplicate definitions.
         JsonArrayBuilder normalized = Json.createArrayBuilder();
-        Map<String, JsonValue> previousTerms = new LinkedHashMap<>();
+        Map<String, TermDefinition> previousTerms = new LinkedHashMap<>();
         for (JsonValue entry : contextArray(context)) {
             JsonObject definitions = null;
             JsonValue normalizedEntry = entry;
@@ -224,26 +224,35 @@ public final class JsonLdJvmOracle {
                 if (definitions != null) {
                     JsonObjectBuilder filtered = Json.createObjectBuilder();
                     definitions.forEach((key, value) -> {
-                        if (key.startsWith("@") || !value.equals(previousTerms.get(key))) {
+                        TermDefinition previous = previousTerms.get(key);
+                        if (key.startsWith("@") || previous == null || !previous.protectedTerm()
+                                || !value.equals(previous.value())) {
                             filtered.add(key, value);
                         }
                     });
-                    normalizedEntry = filtered.build();
+                    definitions = filtered.build();
+                    normalizedEntry = definitions;
                 }
             } else if (entry.getValueType() == JsonValue.ValueType.OBJECT) {
                 definitions = entry.asJsonObject();
             }
             normalized.add(normalizedEntry);
             if (definitions != null) {
+                boolean defaultProtected = definitions.getBoolean("@protected", false);
                 definitions.forEach((key, value) -> {
                     if (!key.startsWith("@")) {
-                        previousTerms.put(key, value);
+                        boolean protectedTerm = value.getValueType() == JsonValue.ValueType.OBJECT
+                                ? value.asJsonObject().getBoolean("@protected", defaultProtected)
+                                : defaultProtected;
+                        previousTerms.put(key, new TermDefinition(value, protectedTerm));
                     }
                 });
             }
         }
         return normalized.build();
     }
+
+    private record TermDefinition(JsonValue value, boolean protectedTerm) {}
 
     private static Document loadDocument(URI url, DocumentLoader.Options options) throws JsonLdException {
         VendoredContext context = VENDORED.get(url.toString());
@@ -379,6 +388,16 @@ public final class JsonLdJvmOracle {
                 .add("name", "x")
                 .build();
         failures += expectRejected("protected term redefinition", redefined, ErrorCode.PROTECTED_TERM_REDEFINITION);
+
+        JsonObject protectedAfterUnprotected = Json.createObjectBuilder()
+                .add("@context", Json.createArrayBuilder()
+                        .add(Json.createObjectBuilder().add("id", "@id"))
+                        .add("https://www.w3.org/ns/credentials/v2")
+                        .add(Json.createObjectBuilder().add("id", "https://example.org/another-id")))
+                .add("@id", "urn:oracle:protected-term-probe")
+                .build();
+        failures += expectRejected("protected term after unprotected duplicate", protectedAfterUnprotected,
+                ErrorCode.PROTECTED_TERM_REDEFINITION);
 
         JsonObject undefined = Json.createObjectBuilder()
                 .add("@context", Json.createObjectBuilder().add("dpp", "https://example.org/dpp#"))
