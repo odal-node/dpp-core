@@ -13,6 +13,7 @@ use dpp_domain::ProductGroup;
 use dpp_domain::access::ProductGroupAccessPolicy;
 
 use super::super::{Issuance, SdJwtVcError, TYP, issue, vct_for, verify};
+pub(super) use crate::jose::VerifyOptions;
 
 pub(super) const KEY_ID: &str = "sd-jwt-issuer";
 pub(super) const ISSUER: &str = "https://passports.operator.example";
@@ -120,12 +121,22 @@ pub(super) fn check(
     credential: &str,
     at: DateTime<Utc>,
 ) -> Result<(), SdJwtVcError> {
+    check_with_options(store, credential, at, VerifyOptions::new())
+}
+
+pub(super) fn check_with_options(
+    store: &KeyStore,
+    credential: &str,
+    at: DateTime<Utc>,
+    options: VerifyOptions<'_>,
+) -> Result<(), SdJwtVcError> {
     verify(
         credential,
         &public_key(store),
         &vct_for(ProductGroup::Battery, SCHEMA_VERSION),
         at,
         None,
+        options,
     )
     .map(|_| ())
 }

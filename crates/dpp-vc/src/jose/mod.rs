@@ -66,12 +66,12 @@
 //! ([`JoseError::KidNotAbsolute`]) when there is no `iss` and the issuer, or the holder of a
 //! presentation, is a URL, so the tokens this crate writes stay strict.
 //!
-//! **Time is explicit.** A [`VerifyOptions`] carries `now`, seconds since the epoch.
-//! Under a `now`, `exp` must be a number and `now` before it, and `nbf` must be a
-//! number and not after `now`, with no leeway, as in `sd_jwt_vc::verify`. With none
-//! neither claim is read. `iat` is never checked: §3.1.3 says it describes
-//! the signature, not the credential. A credential's own `validFrom` and
-//! `validUntil` are the caller's to check.
+//! **Time is explicit.** A [`VerifyOptions`] carries `now`, seconds since the epoch, and an
+//! optional leeway for `exp` and `nbf`, capped at [`MAX_LEEWAY_SECONDS`]. Leeway defaults to
+//! zero. `sd_jwt_vc::verify` takes the same options for the same JWT time claims. With no `now`,
+//! JOSE and COSE do not read `exp` or `nbf`. `iat` is never checked: §3.1.3 says it describes
+//! the signature, not the credential. A credential's own `validFrom` and `validUntil` are
+//! checked separately by `verify_credential_claims` and do not use this leeway.
 //!
 //! **The audience is explicit too.** The same [`VerifyOptions`] carries the audience the
 //! caller identifies as. RFC 7519 §4.1.3 says a JWT "MUST be rejected" when the principal
@@ -227,7 +227,7 @@ mod tests;
 pub use cose_sign::{sign_credential_cose, sign_presentation_cose};
 pub use cose_verify::{verify_credential_cose, verify_presentation_cose};
 pub use error::JoseError;
-pub use options::{KeyBindingRequirement, VerifyOptions};
+pub use options::{KeyBindingRequirement, MAX_LEEWAY_SECONDS, VerifyOptions};
 pub use presentation::verify_presentation;
 pub use sd_jwt_sign::{sign_credential_sd_jwt, sign_presentation_sd_jwt};
 pub use sd_jwt_verify::{verify_credential_sd_jwt, verify_presentation_sd_jwt};

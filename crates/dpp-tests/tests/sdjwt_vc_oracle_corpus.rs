@@ -62,6 +62,7 @@ use dpp_tests::fixtures::{
     passport_with, schema_compat_fixture as fixture_for, schema_for,
     with_restricted_envelope_members, with_restricted_members,
 };
+use dpp_vc::jose::VerifyOptions;
 use dpp_vc::sd_jwt_vc::{Issuance, PASSPORT_CLAIM, SdJwtVcError, issue, vct_for, verify};
 use serde_json::{Map, Number, Value, json};
 
@@ -191,7 +192,7 @@ fn verify_under(
     policy: Option<&KeyBindingPolicy>,
 ) -> Result<Map<String, Value>, SdJwtVcError> {
     match ed25519_key(public_key_b64) {
-        Some(key) => verify(token, &key, vct, now, policy),
+        Some(key) => verify(token, &key, vct, now, policy, VerifyOptions::new()),
         None => Err(SdJwtVcError::BadSignature),
     }
 }

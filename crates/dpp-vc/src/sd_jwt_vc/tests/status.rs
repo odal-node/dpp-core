@@ -51,6 +51,7 @@ fn verified(store: &KeyStore, credential: &SdJwt) -> serde_json::Map<String, Val
         &vct_for(ProductGroup::Battery, SCHEMA_VERSION),
         now(),
         None,
+        VerifyOptions::new(),
     )
     .expect("verifies")
 }

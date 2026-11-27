@@ -8,8 +8,8 @@ use serde_json::{Value, json};
 use dpp_crypto::jws::KeyAlgorithm;
 use dpp_crypto::keystore::KeyEntry;
 
-use super::super::VerifyOptions;
 use super::super::{JoseError, verify_credential, verify_presentation};
+use super::super::{MAX_LEEWAY_SECONDS, VerifyOptions};
 use crate::test_support::NOT_REQUIRED;
 use crate::test_support::at;
 use crate::test_support::{
@@ -30,7 +30,15 @@ fn credential_with(key: &KeyEntry, claim: &str, value: Value) -> String {
 }
 
 fn verify(token: &str, key: &KeyEntry, now: Option<i64>) -> Result<Value, JoseError> {
-    verify_credential(token, &key.public_key(), at(now))
+    verify_with_options(token, key, at(now))
+}
+
+fn verify_with_options(
+    token: &str,
+    key: &KeyEntry,
+    options: VerifyOptions<'_>,
+) -> Result<Value, JoseError> {
+    verify_credential(token, &key.public_key(), options)
 }
 
 // ── exp ───────────────────────────────────────────────────────────────────────
@@ -53,6 +61,50 @@ fn exp_may_be_fractional() {
     assert!(verify(&token, &key, Some(1_800_000_000)).is_ok());
     assert_eq!(
         verify(&token, &key, Some(1_800_000_001)),
+        Err(JoseError::Expired)
+    );
+}
+
+#[test]
+fn exp_leeway_accepts_inside_and_refuses_outside() {
+    let key = key();
+    let token = credential_with(&key, "exp", json!(NOW));
+
+    assert!(verify_with_options(&token, &key, at(Some(NOW + 2)).with_leeway(3),).is_ok());
+    assert_eq!(
+        verify_with_options(&token, &key, at(Some(NOW + 3)).with_leeway(3)),
+        Err(JoseError::Expired)
+    );
+}
+
+#[test]
+fn nbf_leeway_accepts_inside_and_refuses_outside() {
+    let key = key();
+    let token = credential_with(&key, "nbf", json!(NOW));
+
+    assert!(verify_with_options(&token, &key, at(Some(NOW - 3)).with_leeway(3),).is_ok());
+    assert_eq!(
+        verify_with_options(&token, &key, at(Some(NOW - 4)).with_leeway(3)),
+        Err(JoseError::NotYetValid)
+    );
+}
+
+#[test]
+fn leeway_is_capped_at_five_minutes() {
+    let key = key();
+    let token = credential_with(&key, "exp", json!(NOW));
+    let max = i64::try_from(MAX_LEEWAY_SECONDS).expect("maximum leeway fits i64");
+
+    assert!(
+        verify_with_options(
+            &token,
+            &key,
+            at(Some(NOW + max - 1)).with_leeway(MAX_LEEWAY_SECONDS),
+        )
+        .is_ok()
+    );
+    assert_eq!(
+        verify_with_options(&token, &key, at(Some(NOW + max)).with_leeway(u64::MAX),),
         Err(JoseError::Expired)
     );
 }

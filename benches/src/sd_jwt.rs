@@ -10,6 +10,7 @@ use criterion::{BenchmarkId, Criterion, criterion_group, criterion_main};
 use dpp_crypto::sd_jwt::{SdJwt, conceal, conceal_elements};
 use dpp_domain::access::ProductGroupAccessPolicy;
 use dpp_domain::{Passport, ProductGroup};
+use dpp_vc::jose::VerifyOptions;
 use dpp_vc::sd_jwt_vc::{Issuance, issue, vct_for, verify};
 use serde_json::{Map, Value, json};
 
@@ -82,7 +83,17 @@ fn credential(c: &mut Criterion) {
     let public_key = store.load_key(KEY_ID).unwrap().public_key();
 
     c.bench_function("sd_jwt_vc_verify_battery", |b| {
-        b.iter(|| verify(&serialised, &public_key, &vct, now, None).unwrap());
+        b.iter(|| {
+            verify(
+                &serialised,
+                &public_key,
+                &vct,
+                now,
+                None,
+                VerifyOptions::new(),
+            )
+            .unwrap()
+        });
     });
 
     // The wire format on its own, without the signature check.

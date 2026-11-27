@@ -88,6 +88,23 @@ fn a_credential_that_is_not_yet_valid_is_refused_under_a_now_and_not_without_one
     assert!(verify_vc(&message).is_ok());
 }
 
+#[test]
+fn configured_leeway_applies_equally_to_exp_and_nbf() {
+    let exp = forged_credential(&credential(), &cwt(vec![claim(4, uint(1_000))]));
+    assert!(verify_vc_with(&exp, VerifyOptions::new().at(1_002).with_leeway(3)).is_ok());
+    assert_eq!(
+        verify_vc_with(&exp, VerifyOptions::new().at(1_003).with_leeway(3)),
+        Err(JoseError::Expired)
+    );
+
+    let nbf = forged_credential(&credential(), &cwt(vec![claim(5, uint(2_000))]));
+    assert!(verify_vc_with(&nbf, VerifyOptions::new().at(1_997).with_leeway(3)).is_ok());
+    assert_eq!(
+        verify_vc_with(&nbf, VerifyOptions::new().at(1_996).with_leeway(3)),
+        Err(JoseError::NotYetValid)
+    );
+}
+
 /// A NumericDate may be fractional, and `iat` is never checked (§3.3.3: it describes the
 /// signature, not the credential).
 #[test]

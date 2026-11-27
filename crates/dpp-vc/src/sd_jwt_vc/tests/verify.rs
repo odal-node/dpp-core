@@ -45,6 +45,7 @@ fn a_passport_issues_as_an_sd_jwt_vc_and_the_full_credential_verifies() {
         &vct_for(ProductGroup::Battery, SCHEMA_VERSION),
         now(),
         None,
+        VerifyOptions::new(),
     )
     .expect("full credential verifies");
 
@@ -126,8 +127,15 @@ fn a_two_of_four_presentation_verifies_and_withholds_the_other_two() {
         .expect("each chosen Disclosure is referenced")
         .serialise();
 
-    let disclosed = verify(&presentation, &public_key(&store), &vct, now(), None)
-        .expect("presentation verifies");
+    let disclosed = verify(
+        &presentation,
+        &public_key(&store),
+        &vct,
+        now(),
+        None,
+        VerifyOptions::new(),
+    )
+    .expect("presentation verifies");
 
     let pgd = disclosed[PASSPORT_CLAIM]["productGroupData"]
         .as_object()
@@ -180,6 +188,7 @@ fn withholding_a_claim_needs_no_new_signature() {
         &vct,
         now(),
         None,
+        VerifyOptions::new(),
     )
     .unwrap();
     assert!(everything[PASSPORT_CLAIM]["productGroupData"]["stateOfHealthPct"].is_number());
@@ -189,7 +198,15 @@ fn withholding_a_claim_needs_no_new_signature() {
         .present(&reveal.iter().map(String::as_str).collect::<Vec<_>>())
         .expect("each chosen Disclosure is referenced")
         .serialise();
-    let after = verify(&withheld, &public_key(&store), &vct, now(), None).expect("still verifies");
+    let after = verify(
+        &withheld,
+        &public_key(&store),
+        &vct,
+        now(),
+        None,
+        VerifyOptions::new(),
+    )
+    .expect("still verifies");
     assert!(
         !after[PASSPORT_CLAIM]["productGroupData"]
             .as_object()
@@ -229,7 +246,8 @@ fn tampering_with_a_revealed_value_refuses_the_credential() {
             &public_key(&store),
             &vct_for(ProductGroup::Battery, SCHEMA_VERSION),
             now(),
-            None
+            None,
+            VerifyOptions::new(),
         ),
         Err(SdJwtVcError::SdJwt(SdJwtError::UnusedDisclosures(1)))
     );
@@ -247,7 +265,8 @@ fn a_credential_signed_by_another_key_does_not_verify() {
             &public_key(&other),
             &vct_for(ProductGroup::Battery, SCHEMA_VERSION),
             now(),
-            None
+            None,
+            VerifyOptions::new(),
         ),
         Err(SdJwtVcError::BadSignature)
     );
@@ -275,7 +294,8 @@ fn a_mutated_signature_is_refused_before_the_claims_are_read() {
             &public_key(&store),
             &vct_for(ProductGroup::Battery, SCHEMA_VERSION),
             now(),
-            None
+            None,
+            VerifyOptions::new(),
         ),
         Err(SdJwtVcError::BadSignature)
     );
@@ -292,6 +312,7 @@ fn a_credential_of_another_type_is_refused() {
         &vct_for(ProductGroup::Battery, "2.5.0"),
         now(),
         None,
+        VerifyOptions::new(),
     )
     .unwrap_err();
 
