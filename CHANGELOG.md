@@ -219,7 +219,7 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
 
 - **Configurable clock-skew leeway for JWT, COSE, and SD-JWT temporal verification.**
   `VerifyOptions::with_leeway(seconds)` defaults to zero, is capped at five minutes, and
-  applies equally to `exp` and `nbf`. (#639)
+  applies equally to `exp` and `nbf`. (#693)
 
 - **`TransferChain::from_value`: a stored chain read with its refusal as a value.** It applies
   the check `Deserialize` applies, and returns `ChainReadError`. `Refused` holds
