@@ -101,3 +101,6 @@ keys.json
 
 # The second SD-JWT oracle's Maven output: classes and the resolved jar set (CI-only)
 .github/oracle/sdjwt-jvm/target/
+
+# The JVM JSON-LD oracle's Maven output: classes and the resolved jar set (CI-only)
+.github/oracle/jsonld-jvm/target/

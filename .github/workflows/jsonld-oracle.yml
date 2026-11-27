@@ -2,13 +2,13 @@
 # processor.
 #
 # Its own workflow rather than a job in `ci.yml`, for the same reason the AAS and
-# GS1 oracles are: this needs Python, and `cargo build --workspace` succeeding
-# with no Python, no native toolchain and no services is a property this project
-# states publicly. Keeping the dependency here means the main gate never
-# acquires it.
+# GS1 oracles are: this needs Python and a JVM, and `cargo build --workspace`
+# succeeding with neither, no native toolchain and no services is a property this
+# project states publicly. Keeping the dependencies here means the main gate
+# never acquires them.
 #
-# What it answers: *does an independent JSON-LD processor accept every context
-# and document we emit, and does it keep every property?* The Rust tests hold the
+# What it answers: *do two independent JSON-LD processors accept every context
+# and document we emit, and do they keep every property?* The Rust tests hold the
 # contexts to this repository's own reading of the specification, which a
 # transcription error passes, and which cannot see a key that no term reaches. A
 # processor drops such a key with everything inside it and says nothing.
@@ -38,7 +38,7 @@ concurrency:
 
 jobs:
   expand:
-    name: JSON-LD documents expand under an independent processor
+    name: JSON-LD documents expand under two independent processors
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -48,6 +48,12 @@ jobs:
       - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: "3.15"
+
+      - uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880 # v6.3.0
+        with:
+          distribution: temurin
+          java-version: "25"
+          cache: maven
 
       # Pinned exactly, with hashes, for the processor and everything it pulls
       # in. This is somebody else's judgement about what JSON-LD permits, and an
@@ -69,3 +75,11 @@ jobs:
 
       - name: Expand every context and document
         run: python .github/scripts/jsonld_oracle.py
+
+      - name: Build the JVM oracle
+        run: mvn -q -B -f .github/oracle/jsonld-jvm/pom.xml package
+
+      - name: Expand every context and document with Titanium
+        run: >-
+          java -cp '.github/oracle/jsonld-jvm/target/classes:.github/oracle/jsonld-jvm/target/lib/*'
+          io.odalnode.oracle.JsonLdJvmOracle
