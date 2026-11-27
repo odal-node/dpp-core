@@ -13,4 +13,5 @@ mod rfc8785;
 mod sign_typed_with;
 mod signer;
 mod thumbprint;
+mod verifier_errors;
 mod wycheproof;

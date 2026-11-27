@@ -57,6 +57,7 @@
 //! would mean acting on attacker-chosen fields — fetching a status list from a
 //! URL inside an unauthenticated document, above all.
 
+use dpp_crypto::jws::JwsError;
 use dpp_crypto::jws::signer;
 use dpp_crypto::jws::verifier::{extract_kid_from_jws, resolve_verification_key, verify_jws};
 use dpp_crypto::keystore::KeyBackend;
@@ -288,8 +289,10 @@ pub fn authenticate_access_credential_with_reason(
     })?;
 
     match verify_jws(jws, &key) {
-        Ok(true) => {}
-        Ok(false) => return Err(AuthenticationFailure::SignatureDoesNotVerify),
+        Ok(()) => {}
+        Err(JwsError::SignatureDoesNotVerify) => {
+            return Err(AuthenticationFailure::SignatureDoesNotVerify);
+        }
         Err(e) => {
             return Err(AuthenticationFailure::Unverifiable {
                 reason: e.to_string(),

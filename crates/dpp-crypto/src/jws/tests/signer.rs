@@ -124,7 +124,7 @@ fn valid_jws_verifies() {
     let key = SigningKey::generate(&mut crate::os_rng());
     let payload = json!({"id": "test", "status": "published"});
     let jws = make_jws(&key, &payload);
-    assert!(super::super::verifier::verify_jws(&jws, &public_key(&key)).unwrap());
+    assert!(super::super::verifier::verify_jws(&jws, &public_key(&key)).is_ok());
 }
 
 #[test]
@@ -135,10 +135,7 @@ fn tampered_signature_fails() {
     let last = jws.pop().unwrap();
     jws.push(if last == 'A' { 'B' } else { 'A' });
     assert!(
-        matches!(
-            super::super::verifier::verify_jws(&jws, &public_key(&key)),
-            Ok(false) | Err(_)
-        ),
+        super::super::verifier::verify_jws(&jws, &public_key(&key)).is_err(),
         "tampered JWS must be rejected"
     );
 }
@@ -149,7 +146,7 @@ fn wrong_key_fails() {
     let key2 = SigningKey::generate(&mut crate::os_rng());
     let payload = json!({"id": "test"});
     let jws = make_jws(&key1, &payload);
-    assert!(!super::super::verifier::verify_jws(&jws, &public_key(&key2)).unwrap());
+    assert!(super::super::verifier::verify_jws(&jws, &public_key(&key2)).is_err());
 }
 
 /// Regression (red-team ATK-4): the header `alg` must name the key's algorithm,
@@ -165,7 +162,7 @@ fn non_eddsa_alg_is_rejected() {
         let sig_b64 = b64.encode(key.sign(signing_input.as_bytes()).to_bytes());
         let jws = format!("{signing_input}.{sig_b64}");
         assert!(
-            !super::super::verifier::verify_jws(&jws, &public_key(&key)).unwrap(),
+            super::super::verifier::verify_jws(&jws, &public_key(&key)).is_err(),
             "alg={alg} must be rejected"
         );
     }
@@ -235,7 +232,7 @@ fn both_ed25519_identifiers_verify_and_no_other_does() {
         let sig_b64 = b64.encode(key.sign(signing_input.as_bytes()).to_bytes());
         let jws = format!("{signing_input}.{sig_b64}");
         assert_eq!(
-            super::super::verifier::verify_jws(&jws, &public_key(&key)).unwrap(),
+            super::super::verifier::verify_jws(&jws, &public_key(&key)).is_ok(),
             accepted,
             "alg={alg}"
         );

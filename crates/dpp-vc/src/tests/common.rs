@@ -5,7 +5,7 @@ use std::future::Future;
 /// Whether `jws` resolves in `doc` to a key it verifies under.
 pub(super) fn verifies_in(doc: &serde_json::Value, jws: &str) -> bool {
     dpp_crypto::jws::verifier::resolve_verification_key(doc, jws)
-        .is_some_and(|key| dpp_crypto::jws::verifier::verify_jws(jws, &key).expect("verify"))
+        .is_some_and(|key| dpp_crypto::jws::verifier::verify_jws(jws, &key).is_ok())
 }
 
 /// The `kid` a compact JWS names, as a verifier reads it.

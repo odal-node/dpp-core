@@ -39,6 +39,15 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   the curve is refused when it is built, not when a signature is checked against it.
   (#586)
 
+- **`jws::verifier::verify_jws` returns `Result<(), JwsError>`, not
+  `anyhow::Result<bool>`.** A valid signature returns `Ok(())`; a refusal returns a
+  distinct error for malformed compact form, bad signature base64, signature length,
+  refused header (carrying its `HeaderRefusal`), or a signature that does not verify.
+  **Migration:** handle `JwsError::SignatureDoesNotVerify` as the ordinary invalid-signature
+  outcome, and handle the other `JwsError` variants as verification failures.
+  `header_refusal` remains available for callers that inspect a header without verifying
+  its signature. (#688)
+
 - **`resolve_verification_key` returns `Option<PublicKey>`.** It returned the base64url
   `x` of the verification method's JWK. Pass the returned key to `verify_jws` as it
   is, or call `as_bytes()` or `jwk()` where the text was used. It also returns `None`

@@ -98,7 +98,7 @@ pub fn verify(
     let sd_jwt = SdJwt::parse(serialised)?;
 
     match dpp_crypto::jws::verifier::verify_jws(sd_jwt.jwt(), key) {
-        Ok(true) => {}
+        Ok(()) => {}
         _ => return Err(SdJwtVcError::BadSignature),
     }
 

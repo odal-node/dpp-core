@@ -25,7 +25,7 @@ fn harness<T>(result: &Result<T, JoseError>) -> &'static str {
 }
 
 fn signature_is_valid(file: &str, key: &PublicKey) -> bool {
-    verify_jws(&token(file), key).expect("well-formed")
+    verify_jws(&token(file), key).is_ok()
 }
 
 #[test]

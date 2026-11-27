@@ -6,7 +6,7 @@ use base64::Engine;
 use serde_json::{Value, json};
 
 use super::super::algorithm::KeyAlgorithm;
-use super::super::error::SignatureLengthError;
+use super::super::error::{JwsError, SignatureLengthError};
 use super::super::public_key::PublicKey;
 use super::super::signer;
 use super::super::verifier::verify_jws;
@@ -70,7 +70,7 @@ fn no_header_can_move_a_signature_to_the_other_algorithm() {
                 // another algorithm's is malformed for this key (`Err`), and refused.
                 let expected = own && other_id == id;
                 assert_eq!(
-                    verify_jws(&jws, &other.public_key()).unwrap_or(false),
+                    verify_jws(&jws, &other.public_key()).is_ok(),
                     expected,
                     "{header} signed by {id}, verified under {other_id}"
                 );
@@ -207,7 +207,7 @@ fn a_p256_key_round_trips_through_the_encrypted_store() {
     assert_eq!(info.public_key().expect("valid"), generated);
 
     let jws = signer::sign(&store, "issuer", &json!({"a": 1}), "kid").expect("sign");
-    assert!(verify_jws(&jws, &generated).expect("well-formed"));
+    verify_jws(&jws, &generated).expect("well-formed");
     let _ = std::fs::remove_file(path);
 }
 
@@ -278,7 +278,7 @@ fn a_rotation_that_keeps_the_algorithm_cannot_undo_a_concurrent_change() {
 }
 
 /// A signature of the wrong length is a typed error under either algorithm, so a caller
-/// can tell it from a bad signature with `downcast_ref`.
+/// can tell it from a bad signature.
 #[test]
 fn a_wrong_length_signature_downcasts_to_its_error_under_both_algorithms() {
     for (algorithm, jose_alg, label, expected) in [
@@ -297,8 +297,8 @@ fn a_wrong_length_signature_downcasts_to_its_error_under_both_algorithms() {
         );
         let err = verify_jws(&jws, &key).expect_err("a short signature is refused");
         assert_eq!(
-            err.downcast_ref::<SignatureLengthError>(),
-            Some(&SignatureLengthError {
+            err,
+            JwsError::SignatureLength(SignatureLengthError {
                 algorithm,
                 expected,
                 actual,
