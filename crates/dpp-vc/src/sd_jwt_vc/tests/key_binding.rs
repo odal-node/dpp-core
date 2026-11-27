@@ -72,7 +72,14 @@ fn verify_as(
     store: &KeyStore,
     policy: Option<&KeyBindingPolicy>,
 ) -> Result<Map<String, Value>, SdJwtVcError> {
-    verify(token, &public_key(store), &vct(), now(), policy)
+    verify(
+        token,
+        &public_key(store),
+        &vct(),
+        now(),
+        policy,
+        VerifyOptions::new(),
+    )
 }
 
 /// The JWT's payload as signed, without processing any Disclosure.

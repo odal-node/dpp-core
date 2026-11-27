@@ -30,6 +30,9 @@ pub enum SdJwtVcError {
     /// The disclosure mechanism rejected the token.
     #[error(transparent)]
     SdJwt(#[from] SdJwtError),
+    /// The credential's `aud` does not name the caller, or is not a string or array of strings.
+    #[error(transparent)]
+    Audience(#[from] crate::jose::JoseError),
     /// `typ` is absent or is not [`TYP`].
     #[error("typ is '{0}', expected '{TYP}'")]
     WrongTyp(String),

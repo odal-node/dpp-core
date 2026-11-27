@@ -28,6 +28,7 @@ fn presented(store: &KeyStore, credential: &SdJwt, chosen: &[String]) -> Map<Str
         &vct_for(ProductGroup::Battery, SCHEMA_VERSION),
         now(),
         None,
+        VerifyOptions::new(),
     )
     .expect("the presentation verifies")
 }

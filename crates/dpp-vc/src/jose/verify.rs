@@ -57,15 +57,15 @@ pub(crate) const PRESENTATION_CTY: &str = "vp";
 ///
 /// # Time
 ///
-/// `options` carries `now`, seconds since the Unix epoch, supplied rather than read, as in
-/// [`sd_jwt_vc::verify`](crate::sd_jwt_vc::verify): a result that depends on a
-/// hidden clock cannot be reproduced.
+/// `options` carries `now`, seconds since the Unix epoch, supplied rather than read, and a
+/// leeway for clock skew, as in [`sd_jwt_vc::verify`](crate::sd_jwt_vc::verify): a result that
+/// depends on a hidden clock cannot be reproduced. Leeway defaults to zero and is capped at
+/// [`super::MAX_LEEWAY_SECONDS`].
 ///
 /// - **A `now`**: `exp`, if present, must be a JSON number and `now` must be
 ///   before it (RFC 7519 §4.1.4); `nbf`, if present, must be a JSON number and
 ///   `now` must not be before it (RFC 7519 §4.1.5). A value that is not a number is
-///   refused, not skipped. There is no leeway: the comparison is exact, as in
-///   `sd_jwt_vc::verify`.
+///   refused, not skipped. The configured leeway is applied alike to both claims.
 /// - **No `now`**: no check of `exp` or `nbf`, and not their type either.
 ///
 /// # Audience
@@ -200,7 +200,7 @@ pub(crate) fn claims_of(
         }
     }
     if let Some(now) = options.now {
-        check_time(&payload, now)?;
+        check_time(&payload, now, options.leeway().as_secs_f64())?;
     }
     check_audience(&payload, options.audience)?;
     Ok(payload)
@@ -252,7 +252,7 @@ pub(crate) fn check_temporal_claims(payload: &Map<String, Value>) -> Result<(), 
 /// `sd_jwt_vc::verify` makes: skipping an `exp` that does not parse would turn it
 /// into an absent `exp`, which is the unbounded case. A NumericDate may be
 /// fractional (RFC 7519 §2), so the claim is read as a number and compared as one.
-fn check_time(payload: &Map<String, Value>, now: i64) -> Result<(), JoseError> {
+fn check_time(payload: &Map<String, Value>, now: i64, leeway: f64) -> Result<(), JoseError> {
     // Exact for every instant a NumericDate can sensibly name; an `i64` that does
     // not fit an `f64`'s 53 bits is far past the year 285 million.
     let now = now as f64;
@@ -260,18 +260,23 @@ fn check_time(payload: &Map<String, Value>, now: i64) -> Result<(), JoseError> {
         let Some(seconds) = numeric_date(payload, claim)? else {
             continue;
         };
-        check_instant(claim, seconds, now)?;
+        check_instant(claim, seconds, now, leeway)?;
     }
     Ok(())
 }
 
 /// One time claim against `now`: `exp` of `seconds` has been reached when `now` is not before
 /// it (RFC 7519 §4.1.4), and `nbf` of `seconds` has not been when `now` is before it (§4.1.5).
-/// Any other claim name passes. Exact, with no leeway.
-pub(crate) fn check_instant(claim: &str, seconds: f64, now: f64) -> Result<(), JoseError> {
+/// `leeway` is applied in either direction. Any other claim name passes.
+pub(crate) fn check_instant(
+    claim: &str,
+    seconds: f64,
+    now: f64,
+    leeway: f64,
+) -> Result<(), JoseError> {
     match claim {
-        "exp" if now >= seconds => Err(JoseError::Expired),
-        "nbf" if now < seconds => Err(JoseError::NotYetValid),
+        "exp" if now >= seconds && now - seconds >= leeway => Err(JoseError::Expired),
+        "nbf" if now < seconds && seconds - now > leeway => Err(JoseError::NotYetValid),
         _ => Ok(()),
     }
 }
@@ -281,7 +286,10 @@ pub(crate) fn check_instant(claim: &str, seconds: f64, now: f64) -> Result<(), J
 /// string, or an array of strings of which one is equal to it, compared exactly. An `aud`
 /// of any other shape is refused first, so a `null` or a number cannot read as no `aud`,
 /// and an array with one entry that is not a string is refused whatever else it holds.
-fn check_audience(payload: &Map<String, Value>, audience: Option<&str>) -> Result<(), JoseError> {
+pub(crate) fn check_audience(
+    payload: &Map<String, Value>,
+    audience: Option<&str>,
+) -> Result<(), JoseError> {
     let Some(aud) = payload.get("aud") else {
         return Ok(());
     };

@@ -15,6 +15,12 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
 
 ### Breaking
 
+- **`sd_jwt_vc::verify` takes `VerifyOptions`.** The final argument is required to set the
+  clock-skew leeway and verifier audience. A present `aud` must name that audience, or the
+  token is refused; a token with `aud` is refused when no audience is configured. **Migration:**
+  append `VerifyOptions::new()` to an existing call to retain default verification for
+  credentials without `aud`, and use `.for_audience(...)` for credentials that carry it. (#693)
+
 - **Signing and publishing take a `KeyBackend`, not a `KeyStore`.** `jws::sign`,
   `jws::sign_typed`, `jws::verify`, `build_did_document`, `build_issuer_metadata`,
   `sd_jwt_vc::issue` and `sign_access_credential` take `&dyn KeyBackend`, and
@@ -216,6 +222,10 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   `NotYetValid` instead. (#699)
 
 ### Added
+
+- **Configurable clock-skew leeway for JWT, COSE, and SD-JWT temporal verification.**
+  `VerifyOptions::with_leeway(seconds)` defaults to zero, is capped at five minutes, and
+  applies equally to `exp` and `nbf`. (#693)
 
 - **`TransferChain::from_value`: a stored chain read with its refusal as a value.** It applies
   the check `Deserialize` applies, and returns `ChainReadError`. `Refused` holds

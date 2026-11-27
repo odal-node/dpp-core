@@ -29,6 +29,7 @@ use dpp_rules::bundle::{
 };
 use dpp_tests::fixtures::make_subject;
 use dpp_vc::credential::authenticate_access_credential;
+use dpp_vc::jose::VerifyOptions;
 use dpp_vc::sd_jwt_vc::{Issuance, issue, verify};
 use dpp_vc::{
     CredentialBuilder, CredentialRole, LocalIdentityService, SD_JWT_VC_TYP, SdJwtVcError,
@@ -248,7 +249,8 @@ fn an_sd_jwt_vc_with_crit_is_refused() {
             &key,
             &vct,
             now,
-            None
+            None,
+            VerifyOptions::new(),
         )
         .is_ok(),
         "control: the same credential without crit must verify"
@@ -259,7 +261,8 @@ fn an_sd_jwt_vc_with_crit_is_refused() {
             &key,
             &vct,
             now,
-            None
+            None,
+            VerifyOptions::new(),
         ),
         Err(SdJwtVcError::BadSignature)
     ));

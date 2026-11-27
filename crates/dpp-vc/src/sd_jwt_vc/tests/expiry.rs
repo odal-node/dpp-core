@@ -68,6 +68,7 @@ fn verified(
         &vct_for(ProductGroup::Battery, SCHEMA_VERSION),
         instant,
         None,
+        VerifyOptions::new(),
     )
 }
 

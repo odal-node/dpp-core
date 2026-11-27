@@ -148,6 +148,7 @@ fn every_issuer_and_holder_algorithm_pair_issues_binds_and_verifies() {
                 &vct(),
                 now(),
                 Some(&key_binding_policy()),
+                VerifyOptions::new(),
             )
             .unwrap_or_else(|e| panic!("{label}: a bound presentation must verify, got {e:?}"));
 
@@ -197,7 +198,8 @@ fn a_presentation_for_another_audience_is_refused_for_every_pair() {
                     &public_key(store),
                     &vct(),
                     now(),
-                    Some(&key_binding_policy())
+                    Some(&key_binding_policy()),
+                    VerifyOptions::new(),
                 )
                 .is_ok(),
                 "{label}: control: the presentation verifies for its own audience"
@@ -208,7 +210,8 @@ fn a_presentation_for_another_audience_is_refused_for_every_pair() {
                     &public_key(store),
                     &vct(),
                     now(),
-                    Some(&elsewhere)
+                    Some(&elsewhere),
+                    VerifyOptions::new(),
                 ),
                 Err(SdJwtVcError::SdJwt(SdJwtError::KeyBindingRejected("aud"))),
                 "{label}: a Key Binding JWT for another audience is refused"
@@ -256,7 +259,15 @@ fn an_ec_issuer_key_is_published_under_the_kid_its_credentials_name() {
         assert_eq!(jwk["use"], "sig", "{alg}: use");
 
         let key = PublicKey::from_jwk(jwk).expect("the published key reads back");
-        verify(&credential.serialise(), &key, &vct(), now(), None).unwrap_or_else(|e| {
+        verify(
+            &credential.serialise(),
+            &key,
+            &vct(),
+            now(),
+            None,
+            VerifyOptions::new(),
+        )
+        .unwrap_or_else(|e| {
             panic!(
                 "{alg}: a verifier holding the published key must accept the credential, got {e:?}"
             )
@@ -291,7 +302,15 @@ fn a_rotation_to_an_ec_key_keeps_every_credential_verifiable() {
                 resolved,
                 "{name}: the key a credential issued {when} the rotation resolves to"
             );
-            verify(&credential.serialise(), &key, &vct(), now(), None).unwrap_or_else(|e| {
+            verify(
+                &credential.serialise(),
+                &key,
+                &vct(),
+                now(),
+                None,
+                VerifyOptions::new(),
+            )
+            .unwrap_or_else(|e| {
                 panic!("{name}: a credential issued {when} the rotation must verify, got {e:?}")
             });
         }
@@ -323,7 +342,15 @@ fn credentials_issued_while_the_key_rotates_verify_under_the_metadata_published_
         let kid = kid_of(credential.jwt());
         let key = PublicKey::from_jwk(published_jwk(&metadata, &kid))
             .expect("the published key reads back");
-        verify(&credential.serialise(), &key, &vct(), now(), None).unwrap_or_else(|e| {
+        verify(
+            &credential.serialise(),
+            &key,
+            &vct(),
+            now(),
+            None,
+            VerifyOptions::new(),
+        )
+        .unwrap_or_else(|e| {
             panic!(
                 "credential {i} of {} names {kid} and does not verify under it: {e:?}",
                 credentials.len()

@@ -147,6 +147,7 @@ fn a_passport_member_named_like_a_registered_claim_stays_in_the_passport() {
         &vct_for(ProductGroup::Battery, SCHEMA_VERSION),
         now(),
         None,
+        VerifyOptions::new(),
     )
     .expect("the credential's own claims are well-formed whatever the passport holds");
     assert_eq!(claims["iss"], json!(ISSUER));
@@ -179,6 +180,7 @@ fn the_passports_own_status_is_not_the_credentials() {
         &vct_for(ProductGroup::Battery, SCHEMA_VERSION),
         now(),
         None,
+        VerifyOptions::new(),
     )
     .expect("verifies");
     assert!(claims.get("status").is_none());

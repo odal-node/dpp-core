@@ -62,9 +62,9 @@ pub(super) const PRESENTATION_COSE_TYP: &str = "vp+cose";
 /// header", and §1 says a recipient "MUST NOT use the information in the CWT Claims header
 /// parameter beyond the integrity protection or authentication afforded", so one in the
 /// unprotected header is refused by the COSE layer. The claims are applied as the same JWT
-/// claims are in [`verify_credential`](super::verify_credential): `exp` must be later than a
-/// `now` and `nbf` not later, with no leeway, and neither is read without a `now`; an `aud`
-/// is accepted only when it names the audience the caller identifies as (RFC 7519 §4.1.3,
+/// claims are in [`verify_credential`](super::verify_credential): `exp` and `nbf` use the
+/// leeway in `options`, and neither is read without a `now`; an `aud` is accepted only when it
+/// names the audience the caller identifies as (RFC 7519 §4.1.3,
 /// which RFC 8392 §3.1.3 adopts), and a message that carries one is refused when the caller
 /// gave none. `iat` is never checked.
 ///
@@ -159,9 +159,10 @@ fn open(
     if let Some(now) = options.now {
         // Exact for every instant a NumericDate can sensibly name, as in the JOSE form.
         let now = now as f64;
+        let leeway = options.leeway().as_secs_f64();
         for (claim, seconds) in [("exp", exp), ("nbf", nbf)] {
             if let Some(seconds) = seconds {
-                check_instant(claim, seconds, now)?;
+                check_instant(claim, seconds, now, leeway)?;
             }
         }
     }

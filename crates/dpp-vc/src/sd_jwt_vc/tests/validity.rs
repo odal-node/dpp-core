@@ -8,6 +8,7 @@ use dpp_domain::ProductGroup;
 
 use super::super::{Issuance, SdJwtVcError, issue, vct_for};
 use super::common::*;
+use crate::jose::VerifyOptions;
 use crate::test_support::temp_store;
 
 /// Both claims are OPTIONAL in the profile, so their absence means "no bound"
@@ -74,6 +75,54 @@ fn a_credential_presented_before_nbf_is_refused() {
         Err(SdJwtVcError::NotYetValid { .. })
     ));
     assert!(check(&store, &credential, Utc.timestamp_opt(start, 0).unwrap()).is_ok());
+}
+
+#[test]
+fn configured_leeway_applies_equally_to_exp_and_nbf() {
+    let store = temp_store("sdjwtvc-leeway", KEY_ID);
+    let leeway = VerifyOptions::new().with_leeway(3);
+
+    let expiry = ISSUED_AT + 3600;
+    let exp_credential = credential_with(&store, &[("exp", json!(expiry))]);
+    assert!(
+        check_with_options(
+            &store,
+            &exp_credential,
+            Utc.timestamp_opt(expiry + 2, 0).unwrap(),
+            leeway,
+        )
+        .is_ok()
+    );
+    assert!(matches!(
+        check_with_options(
+            &store,
+            &exp_credential,
+            Utc.timestamp_opt(expiry + 3, 0).unwrap(),
+            leeway,
+        ),
+        Err(SdJwtVcError::Expired { .. })
+    ));
+
+    let start = ISSUED_AT + 3600;
+    let nbf_credential = credential_with(&store, &[("nbf", json!(start))]);
+    assert!(
+        check_with_options(
+            &store,
+            &nbf_credential,
+            Utc.timestamp_opt(start - 3, 0).unwrap(),
+            leeway,
+        )
+        .is_ok()
+    );
+    assert!(matches!(
+        check_with_options(
+            &store,
+            &nbf_credential,
+            Utc.timestamp_opt(start - 4, 0).unwrap(),
+            leeway,
+        ),
+        Err(SdJwtVcError::NotYetValid { .. })
+    ));
 }
 
 /// A malformed temporal claim must not degrade to "absent", which is the
