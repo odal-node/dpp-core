@@ -117,6 +117,12 @@ right, is a reviewer's call. A cell that reads `No` makes no claim.
 
 ## Other specifications
 
+The W3C JSON-LD evidence includes PyLD 3.3.0 and Titanium JSON-LD 2.0.0-M2. Both
+judge the same generated corpus in `.github/workflows/jsonld-oracle.yml`, with
+hash-checked local W3C contexts and negative controls. The JVM judge removes
+only exactly repeated term definitions from later vendored contexts to work
+around Titanium's protected-term handling; conflicting definitions still fail.
+
 | Specification | Revision cited | Status as read | Read | Implemented in | Evidence | Conformance claimed |
 |---|---|---|---|---|---|---|
 | W3C Verifiable Credentials Data Model | v2.0 | W3C Recommendation, 15 May 2025. v2.1 is a Working Draft (22 October 2026) | 2026-11-16 | `dpp-vc::credential` (`DppAccessCredential`) | Unit tests; `access_gatekeeping.rs` | No |

@@ -81,7 +81,9 @@ updates:
       - ci
 
   - package-ecosystem: maven
-    directory: "/.github/oracle/jades"
+    directories:
+      - "/.github/oracle/jades"
+      - "/.github/oracle/jsonld-jvm"
     schedule:
       interval: weekly
       day: monday
