@@ -338,3 +338,61 @@ fn two_issuances_of_one_passport_share_no_digest() {
     // And the signed tokens therefore differ too.
     assert_ne!(first.jwt(), second.jwt());
 }
+
+#[test]
+fn a_credential_for_another_audience_is_refused() {
+    let store = temp_store("sdjwtvc-audience", KEY_ID);
+    let credential = credential_with(&store, &[("aud", json!("https://other.example"))]);
+
+    assert_eq!(
+        check_with_options(
+            &store,
+            &credential,
+            now(),
+            VerifyOptions::new().for_audience("https://verifier.example"),
+        ),
+        Err(SdJwtVcError::Audience(
+            crate::jose::JoseError::AudienceMismatch {
+                audience: Some("https://verifier.example".to_owned())
+            }
+        ))
+    );
+}
+
+#[test]
+fn the_audience_is_checked_only_when_the_credential_carries_it() {
+    let store = temp_store("sdjwtvc-audience-policy", KEY_ID);
+    let no_audience = issued(&store).serialise();
+    let matching_audience = credential_with(
+        &store,
+        &[(
+            "aud",
+            json!(["https://other.example", "https://verifier.example"]),
+        )],
+    );
+    let audience_without_verifier =
+        credential_with(&store, &[("aud", json!("https://verifier.example"))]);
+    let malformed_audience = credential_with(&store, &[("aud", json!(null))]);
+
+    let with_verifier = VerifyOptions::new().for_audience("https://verifier.example");
+    assert!(check_with_options(&store, &no_audience, now(), VerifyOptions::new()).is_ok());
+    assert!(check_with_options(&store, &no_audience, now(), with_verifier).is_ok());
+    assert!(check_with_options(&store, &matching_audience, now(), with_verifier).is_ok());
+    assert_eq!(
+        check_with_options(
+            &store,
+            &audience_without_verifier,
+            now(),
+            VerifyOptions::new(),
+        ),
+        Err(SdJwtVcError::Audience(
+            crate::jose::JoseError::AudienceMismatch { audience: None }
+        ))
+    );
+    assert_eq!(
+        check_with_options(&store, &malformed_audience, now(), with_verifier),
+        Err(SdJwtVcError::Audience(
+            crate::jose::JoseError::MalformedAudience
+        ))
+    );
+}

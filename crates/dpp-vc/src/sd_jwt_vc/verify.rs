@@ -10,7 +10,7 @@ use crate::token_status_list::StatusReference;
 
 use super::TYP;
 use super::error::SdJwtVcError;
-use crate::jose::VerifyOptions;
+use crate::jose::{VerifyOptions, check_audience};
 
 /// The temporal claims of draft-ietf-oauth-sd-jwt-vc-19 clause 2.2.2, each
 /// OPTIONAL, each a JWT `NumericDate` (RFC 7519 clause 2) when present.
@@ -41,8 +41,8 @@ const NEVER_DISCLOSED: [&str; 8] = [
 /// disclosure mechanism, which refuses any disclosure that matches nothing; Key
 /// Binding, as `key_binding` asks; that no claim clause 2.2.2.3 keeps out of
 /// Disclosures arrived in one; that a `status`, if present, is an object and any
-/// `status_list` in it is an index and a URI; the presence of `iss` and `vct`; `vct`
-/// against what the caller expected; and the validity window.
+/// `status_list` in it is an index and a URI; the presence of `iss` and `vct`; `vct` against
+/// what the caller expected; `aud` against the audience in `options`; and the validity window.
 ///
 /// **The status itself is not looked up.** That needs the list, which is fetched.
 /// Read the reference with
@@ -80,6 +80,7 @@ const NEVER_DISCLOSED: [&str; 8] = [
 ///
 /// `options` supplies the same bounded clock-skew leeway as the JOSE verifiers.
 /// It defaults to zero and is applied equally to `exp` and `nbf`.
+/// The `aud` claim follows the same audience rule as the JOSE verifiers.
 ///
 /// `nbf` and `exp` are OPTIONAL in the profile, so their absence is valid and
 /// means "no bound". Present and passed, or present and not yet reached, is a
@@ -158,6 +159,7 @@ pub fn verify(
         });
     }
 
+    check_audience(&payload, options.audience)?;
     check_validity_window(&payload, now, options.leeway())?;
 
     Ok(payload)
@@ -174,7 +176,11 @@ fn check_validity_window(
     now: DateTime<Utc>,
     leeway: std::time::Duration,
 ) -> Result<(), SdJwtVcError> {
-    let leeway = Duration::from_std(leeway).expect("VerifyOptions bounds leeway to 300 seconds");
+    #[expect(
+        clippy::cast_possible_wrap,
+        reason = "VerifyOptions bounds leeway to 300 seconds"
+    )]
+    let leeway = Duration::seconds(leeway.as_secs() as i64);
     for claim in TEMPORAL_CLAIMS {
         let Some(value) = payload.get(claim) else {
             continue;

@@ -234,5 +234,6 @@ pub use sd_jwt_verify::{verify_credential_sd_jwt, verify_presentation_sd_jwt};
 pub use sign::{sign_credential, sign_presentation};
 pub use unverified_envelope::UnverifiedEnvelope;
 pub use verified_presentation::VerifiedPresentation;
+pub(crate) use verify::check_audience;
 pub use verify::verify_credential;
 pub use vocabulary::{CREDENTIAL_TERMS, PRESENTATION_TERMS};

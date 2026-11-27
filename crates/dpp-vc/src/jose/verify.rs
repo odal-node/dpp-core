@@ -286,7 +286,10 @@ pub(crate) fn check_instant(
 /// string, or an array of strings of which one is equal to it, compared exactly. An `aud`
 /// of any other shape is refused first, so a `null` or a number cannot read as no `aud`,
 /// and an array with one entry that is not a string is refused whatever else it holds.
-fn check_audience(payload: &Map<String, Value>, audience: Option<&str>) -> Result<(), JoseError> {
+pub(crate) fn check_audience(
+    payload: &Map<String, Value>,
+    audience: Option<&str>,
+) -> Result<(), JoseError> {
     let Some(aud) = payload.get("aud") else {
         return Ok(());
     };
