@@ -31,6 +31,11 @@ This file was started retroactively on 2026-07-03 at v0.4.0; entries for
   `#archived-`, which is how an archived key is named: a current key by that name was left
   out of the listing and read as an archive of another key. (#646)
 
+- **`build_did_document` no longer creates a missing signing key.** It now returns an
+  error when `key_id` is absent. Call `KeyBackend::generate_key(key_id)` explicitly
+  during application startup, before constructing the identity service or serving the
+  DID document. (#689)
+
 - **Verification takes a `PublicKey`, not base64 text.**
   `jws::verifier::verify_jws` takes `&PublicKey`, a validated key that carries the
   algorithm it is used under. Build the key once with
