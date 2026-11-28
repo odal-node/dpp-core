@@ -2,7 +2,7 @@
 
 use base64::Engine;
 use chrono::{DateTime, Duration, Utc};
-use dpp_crypto::jws::{PublicKey, canonical::canonicalize, verify_jws};
+use dpp_crypto::jws::{JwsError, PublicKey, canonical::canonicalize, verify_jws};
 use serde_json::Value;
 
 use super::bound::SnapshotBound;
@@ -85,12 +85,12 @@ pub fn verify_snapshot_bound(
     // matching bytes with no valid signature say nothing about who produced
     // them.
     match verify_jws(proof, key) {
-        Ok(true) => {}
-        Ok(false) => {
+        Ok(()) => {}
+        Err(JwsError::SignatureDoesNotVerify | JwsError::HeaderRefused(_)) => {
             return SnapshotBound::Unproven("snapshot proof does not verify".to_owned());
         }
-        Err(e) => {
-            return SnapshotBound::Unproven(format!("snapshot proof is malformed: {e}"));
+        Err(error) => {
+            return SnapshotBound::Unproven(format!("snapshot proof is malformed: {error}"));
         }
     }
 

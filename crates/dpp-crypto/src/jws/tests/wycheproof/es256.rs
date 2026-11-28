@@ -146,7 +146,7 @@ const RFC7515_A3_JWS: &str = concat!(
 /// verifier that refused high-S would refuse the RFC's example.
 #[test]
 fn the_rfc7515_es256_example_verifies_and_is_high_s() {
-    assert!(verify_jws(RFC7515_A3_JWS, &rfc7515_key()).expect("well-formed"));
+    verify_jws(RFC7515_A3_JWS, &rfc7515_key()).expect("well-formed");
 
     let signature = B64
         .decode(RFC7515_A3_JWS.rsplit('.').next().expect("signature"))
@@ -157,11 +157,11 @@ fn the_rfc7515_es256_example_verifies_and_is_high_s() {
     // signature bytes.
     let (input, _) = RFC7515_A3_JWS.rsplit_once('.').expect("three parts");
     let twin = format!("{input}.{}", B64.encode(negate_s(&signature)));
-    assert!(verify_jws(&twin, &rfc7515_key()).expect("well-formed"));
+    verify_jws(&twin, &rfc7515_key()).expect("well-formed");
 
     // And a changed payload does not.
     let altered = RFC7515_A3_JWS.replacen("eyJpc3Mi", "eyJpc3Ni", 1);
-    assert!(!verify_jws(&altered, &rfc7515_key()).expect("well-formed"));
+    assert!(verify_jws(&altered, &rfc7515_key()).is_err());
 }
 
 // ── RFC 6979 A.2.5 ────────────────────────────────────────────────────────────
@@ -254,7 +254,7 @@ fn this_crate_verifies_what_ring_signs_including_high_s() {
             high += 1;
         }
         let jws = format!("{input}.{}", B64.encode(signature.as_ref()));
-        assert!(verify_jws(&jws, &key).expect("well-formed"), "case {i}");
+        assert!(verify_jws(&jws, &key).is_ok(), "case {i}");
     }
     assert!(high > 40, "ring produced {high} high-S signatures of 200");
 }
@@ -326,16 +326,16 @@ fn the_suite_verification_fixtures_get_the_expected_verdicts() {
         "../../fixtures/w3c-vc-jose-cose/credential-jose-unknown-extensions.txt"
     ));
 
-    assert!(verify_jws(&test6, &p).expect("well-formed"), "test 6");
-    assert!(verify_jws(&test8, &ed).expect("well-formed"), "test 8");
-    assert!(!verify_jws(&test12, &ed).expect("well-formed"), "test 12");
+    assert!(verify_jws(&test6, &p).is_ok(), "test 6");
+    assert!(verify_jws(&test8, &ed).is_ok(), "test 8");
+    assert!(verify_jws(&test12, &ed).is_err(), "test 12");
 
     let header: Value =
         serde_json::from_slice(&B64.decode(test9.split('.').next().unwrap()).expect("b64"))
             .expect("json");
     assert_eq!(header["alg"], "ES512");
     assert!(header.get("crit").is_none(), "test 9 carries no crit");
-    assert!(!verify_jws(&test9, &ed).expect("well-formed"), "test 9");
+    assert!(verify_jws(&test9, &ed).is_err(), "test 9");
 }
 
 /// The order of the P-256 group, big-endian.

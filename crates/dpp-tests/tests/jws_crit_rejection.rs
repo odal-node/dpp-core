@@ -17,7 +17,7 @@ use std::sync::Arc;
 
 use base64::Engine;
 use chrono::{TimeZone, Utc};
-use dpp_crypto::jws::{KeyAlgorithm, PublicKey, canonicalize, verifier::verify_jws};
+use dpp_crypto::jws::{JwsError, KeyAlgorithm, PublicKey, canonicalize, verifier::verify_jws};
 use dpp_crypto::keystore::KeyStore;
 use dpp_crypto::sd_jwt::SdJwt;
 use dpp_domain::ProductGroup;
@@ -283,14 +283,18 @@ impl JwsVerify for OverDppCrypto {
             RulesetError::Malformed(format!("unsupported pinned algorithm `{}`", key.alg))
         })?;
         // A key that does not decode, or is not a point of that algorithm, is
-        // malformed input, as every failure of `verify_jws` was before keys were
-        // validated.
+        // malformed input; `verify_jws` distinguishes these errors from a bad
+        // signature.
         let raw = base64::engine::general_purpose::URL_SAFE_NO_PAD
             .decode(key.public_key_b64)
             .map_err(|e| RulesetError::Malformed(e.to_string()))?;
         let public_key = PublicKey::from_bytes(algorithm, &raw)
             .map_err(|e| RulesetError::Malformed(e.to_string()))?;
-        verify_jws(jws, &public_key).map_err(|e| RulesetError::Malformed(e.to_string()))
+        match verify_jws(jws, &public_key) {
+            Ok(()) => Ok(true),
+            Err(JwsError::SignatureDoesNotVerify | JwsError::HeaderRefused(_)) => Ok(false),
+            Err(error) => Err(RulesetError::Malformed(error.to_string())),
+        }
     }
 }
 

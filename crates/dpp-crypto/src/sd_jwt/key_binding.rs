@@ -225,7 +225,7 @@ impl SdJwt {
         if declared.is_some() && declared.as_deref() != alg {
             return Err(Rejected("alg"));
         }
-        if !verify_jws(kb, &key).unwrap_or(false) {
+        if verify_jws(kb, &key).is_err() {
             return Err(Rejected("the signature"));
         }
         if !header

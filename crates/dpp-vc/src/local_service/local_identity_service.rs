@@ -9,6 +9,7 @@ use sha2::{Digest, Sha256};
 use dpp_domain::ports::identity::IdentityPort;
 use dpp_domain::{DppError, PassportId, SignedCredential};
 
+use dpp_crypto::jws::JwsError;
 use dpp_crypto::jws::signer;
 use dpp_crypto::jws::verifier::{resolve_verification_key, verify_jws};
 use dpp_crypto::keystore::KeyBackend;
@@ -90,8 +91,14 @@ impl IdentityPort for LocalIdentityService {
         let key = resolve_verification_key(&did_doc, jws)
             .ok_or_else(|| DppError::Signing("no matching public key in DID document".into()))?;
 
-        if !verify_jws(jws, &key).map_err(|e| DppError::Signing(e.to_string()))? {
-            return Ok(false);
+        match verify_jws(jws, &key) {
+            Ok(()) => {}
+            Err(
+                JwsError::MalformedCompact
+                | JwsError::HeaderRefused(_)
+                | JwsError::SignatureDoesNotVerify,
+            ) => return Ok(false),
+            Err(error) => return Err(DppError::Signing(error.to_string())),
         }
 
         let b64 = base64::engine::general_purpose::URL_SAFE_NO_PAD;

@@ -42,7 +42,7 @@ fn paths(paths: &Value) -> Vec<ClaimPath> {
 /// Whether the Issuer-signed JWT of the SD-JWT in `file` verifies under `key`.
 fn signature_is_valid(file: &str, key: &PublicKey) -> bool {
     let sd_jwt = SdJwt::parse(&token(file)).expect("an SD-JWT");
-    verify_jws(sd_jwt.jwt(), key).expect("well-formed")
+    verify_jws(sd_jwt.jwt(), key).is_ok()
 }
 
 fn payload_of(jwt: &str) -> Value {

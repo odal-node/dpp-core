@@ -4,8 +4,8 @@
 use base64::Engine as _;
 use serde_json::{Map, Value};
 
-use dpp_crypto::jws::verifier::{header_refusal, verify_jws};
-use dpp_crypto::jws::{HeaderRefusal, PublicKey};
+use dpp_crypto::jws::verifier::verify_jws;
+use dpp_crypto::jws::{HeaderRefusal, JwsError, PublicKey};
 
 use super::absolute_url::is_absolute_url;
 use super::error::JoseError;
@@ -127,28 +127,36 @@ pub(crate) fn open_token(
     if jws.split('.').count() != 3 {
         return Err(JoseError::NotCompactJws);
     }
-    match header_refusal(jws, key.algorithm()) {
-        None => {}
-        Some(HeaderRefusal::Critical) => return Err(JoseError::UnsupportedCritical),
-        Some(HeaderRefusal::Algorithm { found }) => {
+    let unencoded_payload = unencoded_payload(jws);
+    match verify_jws(jws, key) {
+        Ok(()) => {}
+        Err(JwsError::MalformedCompact) => return Err(JoseError::NotCompactJws),
+        Err(JwsError::HeaderRefused(HeaderRefusal::Unreadable)) => {
+            return Err(JoseError::UnreadableHeader);
+        }
+        Err(JwsError::HeaderRefused(HeaderRefusal::Critical)) => {
+            return Err(JoseError::UnsupportedCritical);
+        }
+        Err(JwsError::HeaderRefused(HeaderRefusal::Algorithm { found })) => {
             return Err(JoseError::AlgorithmMismatch {
                 header_alg: found,
                 key_alg: key.algorithm(),
             });
         }
-        Some(_) => return Err(JoseError::UnreadableHeader),
-    }
-    if unencoded_payload(jws) {
-        return Err(JoseError::UnencodedPayload);
-    }
-    match verify_jws(jws, key) {
-        Ok(true) => {}
-        Ok(false) => return Err(JoseError::SignatureDoesNotVerify),
-        Err(e) => {
+        Err(
+            JwsError::BadBase64 | JwsError::SignatureLength(_) | JwsError::SignatureDoesNotVerify,
+        ) if unencoded_payload => return Err(JoseError::UnencodedPayload),
+        Err(JwsError::SignatureDoesNotVerify) => {
+            return Err(JoseError::SignatureDoesNotVerify);
+        }
+        Err(error) => {
             return Err(JoseError::Unverifiable {
-                reason: e.to_string(),
+                reason: error.to_string(),
             });
         }
+    }
+    if unencoded_payload {
+        return Err(JoseError::UnencodedPayload);
     }
     match media_type::header_type_refusal(jws, typ, cty) {
         None => {}
@@ -206,9 +214,8 @@ pub(crate) fn claims_of(
     Ok(payload)
 }
 
-/// Whether the protected header sets `b64` to the boolean `false` (RFC 7797 §7). The
-/// header has already been read by [`header_refusal`], so an unreadable one answers
-/// `false` here and is refused there.
+/// Whether the protected header sets `b64` to the boolean `false` (RFC 7797 §7).
+/// An unreadable header answers `false` here and is refused by `verify_jws`.
 fn unencoded_payload(jws: &str) -> bool {
     let b64 = base64::engine::general_purpose::URL_SAFE_NO_PAD;
     jws.split('.')

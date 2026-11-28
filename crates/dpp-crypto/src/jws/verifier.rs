@@ -4,46 +4,49 @@
 use base64::Engine;
 
 use super::algorithm::{JWK_THUMBPRINT_URI_PREFIX, KeyAlgorithm};
-use super::error::SignatureLengthError;
+use super::error::{JwsError, SignatureLengthError};
 use super::header_refusal::HeaderRefusal;
 use super::public_key::PublicKey;
 
 /// Verify a compact JWS under `key`.
 ///
-/// Returns `Ok(true)` when the signature is valid, `Ok(false)` when it is not.
-/// A protected header that names a critical extension (`crit`, RFC 7515 clause
-/// 4.1.11), or whose `alg` is not the key's algorithm, is refused the same way:
-/// `Ok(false)`. Returns `Err` only on malformed input (bad base64, or a
-/// signature of the wrong length).
-pub fn verify_jws(jws: &str, key: &PublicKey) -> anyhow::Result<bool> {
+/// Returns `Ok(())` when the signature is valid, or a [`JwsError`] naming why it
+/// was refused.
+pub fn verify_jws(jws: &str, key: &PublicKey) -> Result<(), JwsError> {
     let b64 = base64::engine::general_purpose::URL_SAFE_NO_PAD;
 
-    let parts: Vec<&str> = jws.splitn(3, '.').collect();
-    if parts.len() != 3 {
-        return Ok(false);
+    let mut parts = jws.split('.');
+    let (Some(protected), Some(payload), Some(signature)) =
+        (parts.next(), parts.next(), parts.next())
+    else {
+        return Err(JwsError::MalformedCompact);
+    };
+    if parts.next().is_some() {
+        return Err(JwsError::MalformedCompact);
     }
 
     // The key names its algorithm; the header may only confirm it. Rejects
     // `alg:none` and every substitution downgrade.
-    if !header_admissible(jws, key.algorithm()) {
-        return Ok(false);
+    if let Some(refusal) = header_refusal(jws, key.algorithm()) {
+        return Err(JwsError::HeaderRefused(refusal));
     }
 
-    let signing_input = format!("{}.{}", parts[0], parts[1]);
-    let sig_bytes = b64
-        .decode(parts[2])
-        .map_err(|e| anyhow::anyhow!("base64 signature: {e}"))?;
+    let signing_input = format!("{protected}.{payload}");
+    let sig_bytes = b64.decode(signature).map_err(|_| JwsError::BadBase64)?;
     let expected = key.algorithm().signature_len();
     if sig_bytes.len() != expected {
-        return Err(SignatureLengthError {
+        return Err(JwsError::SignatureLength(SignatureLengthError {
             algorithm: key.algorithm(),
             expected,
             actual: sig_bytes.len(),
-        }
-        .into());
+        }));
     }
 
-    Ok(key.verify(signing_input.as_bytes(), &sig_bytes))
+    if key.verify(signing_input.as_bytes(), &sig_bytes) {
+        Ok(())
+    } else {
+        Err(JwsError::SignatureDoesNotVerify)
+    }
 }
 
 /// The absolute form of an identifier inside the document `document_id`: a
@@ -103,8 +106,9 @@ pub(crate) fn header_admissible(jws: &str, expected: KeyAlgorithm) -> bool {
 /// than later. Refused for a missing `alg`, `alg:none`, or anything outside the
 /// allowlist.
 ///
-/// [`verify_jws`] answers `false` for every refusal here without saying which, so
-/// a caller that has to tell its user *why* a token failed asks this first.
+/// [`verify_jws`] returns the refusal as [`JwsError::HeaderRefused`]. This helper
+/// remains useful when a caller needs to inspect a protected header without
+/// verifying its signature.
 #[must_use]
 pub fn header_refusal(jws: &str, expected: KeyAlgorithm) -> Option<HeaderRefusal> {
     let b64 = base64::engine::general_purpose::URL_SAFE_NO_PAD;

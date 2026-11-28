@@ -58,7 +58,7 @@ impl StatusListToken {
         now: DateTime<Utc>,
     ) -> Result<Self, TokenStatusListError> {
         match dpp_crypto::jws::verifier::verify_jws(token, key) {
-            Ok(true) => {}
+            Ok(()) => {}
             _ => return Err(TokenStatusListError::BadSignature),
         }
 

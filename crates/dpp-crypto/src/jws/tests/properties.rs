@@ -110,7 +110,7 @@ fn key_named_by(public_key_b64: &str) -> Option<super::super::PublicKey> {
 
 proptest! {
     /// `verify_jws` must never panic on arbitrary compact-JWS-shaped input —
-    /// it should fail closed (`Ok(false)`) or report a parse error (`Err`),
+    /// it should return a typed refusal (`Err`),
     /// never crash the process that's verifying an untrusted signature. The key
     /// is fuzzed as well: a string that names a key is verified under that key,
     /// and any other string under each of `fixed_keys()`.

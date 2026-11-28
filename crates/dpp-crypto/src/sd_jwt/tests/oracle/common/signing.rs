@@ -130,7 +130,7 @@ pub(crate) fn ours(token: &str, public_key_b64: &str) -> Verdict {
     };
     match ed25519_key(public_key_b64) {
         Some(key) => match verify_jws(parsed.jwt(), &key) {
-            Ok(true) => structure(token),
+            Ok(()) => structure(token),
             other => Verdict::refused(format!("signature: {other:?}")),
         },
         None => Verdict::refused(NOT_A_KEY),
@@ -175,7 +175,7 @@ pub(crate) fn ours_bound(token: &str, public_key_b64: &str, policy: &KeyBindingP
     };
     match ed25519_key(public_key_b64) {
         Some(key) => match verify_jws(parsed.jwt(), &key) {
-            Ok(true) => bound_structure(token, policy),
+            Ok(()) => bound_structure(token, policy),
             other => Verdict::refused(format!("signature: {other:?}")),
         },
         None => Verdict::refused(NOT_A_KEY),

@@ -5,13 +5,14 @@
 //! matter, because only the first segment is read. Each refusal is paired with the
 //! control that is not refused, so a refusal cannot be a flaw in the construction.
 //! The last test ties the function to [`verify_jws`]: every token this function
-//! refuses is a token `verify_jws` answers `false` for, even with a genuine
-//! signature, so splitting the one check into a typed one changed no verdict.
+//! refuses carries the same [`HeaderRefusal`] in `JwsError`, even with a genuine
+//! signature.
 
 use base64::Engine;
 use serde_json::{Value, json};
 
 use super::super::algorithm::KeyAlgorithm;
+use super::super::error::JwsError;
 use super::super::header_refusal::HeaderRefusal;
 use super::super::verifier::{header_refusal, verify_jws};
 use crate::test_support::temp_store;
@@ -147,10 +148,9 @@ fn an_absent_or_non_string_algorithm_is_refused_with_nothing_found() {
     }
 }
 
-/// A genuine signature over a refused header is still refused by `verify_jws`, so the
-/// typed reason and the boolean agree.
+/// A genuine signature over a refused header carries the same reason from both helpers.
 #[test]
-fn verify_jws_refuses_exactly_what_header_refusal_refuses() {
+fn verify_jws_returns_the_header_refusal() {
     let store = temp_store("header-refusal", "k");
     let key = store.load_key("k").expect("load key");
     let public = key.public_key();
@@ -166,23 +166,38 @@ fn verify_jws_refuses_exactly_what_header_refusal_refuses() {
         )
     };
 
-    for (header, refused) in [
-        (json!({"alg": "EdDSA"}), false),
-        (json!({"alg": "EdDSA", "crit": ["x"], "x": 1}), true),
-        (json!({"alg": "ES256"}), true),
-        (json!({"alg": "none"}), true),
-        (json!({}), true),
+    for (header, expected) in [
+        (json!({"alg": "EdDSA"}), None),
+        (
+            json!({"alg": "EdDSA", "crit": ["x"], "x": 1}),
+            Some(HeaderRefusal::Critical),
+        ),
+        (
+            json!({"alg": "ES256"}),
+            Some(HeaderRefusal::Algorithm {
+                found: Some("ES256".to_owned()),
+            }),
+        ),
+        (
+            json!({"alg": "none"}),
+            Some(HeaderRefusal::Algorithm {
+                found: Some("none".to_owned()),
+            }),
+        ),
+        (json!({}), Some(HeaderRefusal::Algorithm { found: None })),
     ] {
         let jws = sign(&header);
         assert_eq!(
-            header_refusal(&jws, public.algorithm()).is_some(),
-            refused,
+            header_refusal(&jws, public.algorithm()),
+            expected.clone(),
             "{header}"
         );
-        assert_eq!(
-            verify_jws(&jws, &public).expect("well-formed"),
-            !refused,
-            "{header}"
-        );
+        match (expected, verify_jws(&jws, &public)) {
+            (None, Ok(())) => {}
+            (Some(expected), Err(JwsError::HeaderRefused(actual))) => {
+                assert_eq!(actual, expected, "{header}");
+            }
+            (expected, actual) => panic!("expected {expected:?}, got {actual:?}: {header}"),
+        }
     }
 }

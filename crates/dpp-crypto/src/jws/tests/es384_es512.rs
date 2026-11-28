@@ -141,7 +141,7 @@ fn p384_and_p521_keys_round_trip_through_the_encrypted_store() {
         let info = store.public_key(id).expect("info");
         assert_eq!(&info.public_key().expect("valid"), public, "{id}");
         let jws = crate::jws::signer::sign(&store, id, &json!({"a": 1}), "kid").expect("sign");
-        assert!(super::super::verifier::verify_jws(&jws, public).expect("well-formed"));
+        super::super::verifier::verify_jws(&jws, public).expect("well-formed");
     }
 
     assert_eq!(

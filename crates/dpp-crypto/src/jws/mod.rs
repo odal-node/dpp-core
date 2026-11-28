@@ -16,7 +16,7 @@ pub use algorithm::{
     JWK_THUMBPRINT_URI_PREFIX, KeyAlgorithm, P256_CRV, P384_CRV, P521_CRV, is_allowed_alg,
 };
 pub use canonical::canonicalize;
-pub use error::{PublicKeyError, SignatureLengthError};
+pub use error::{JwsError, PublicKeyError, SignatureLengthError};
 pub use header_refusal::HeaderRefusal;
 pub use public_key::PublicKey;
 pub use signer::{sign, sign_typed, sign_typed_with, verify};

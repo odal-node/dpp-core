@@ -133,11 +133,11 @@ fn the_rfc_signing_example_reproduces_byte_for_byte() {
 #[test]
 fn this_verifier_accepts_the_rfc_jws_and_refuses_an_altered_one() {
     let published = format!("{HEADER_B64}.{PAYLOAD_B64}.{SIGNATURE_B64}");
-    assert!(verify_jws(&published, &rfc_key()).expect("well-formed"));
+    verify_jws(&published, &rfc_key()).expect("well-formed");
 
     let altered_payload = B64.encode(format!("{PAYLOAD_TEXT}!"));
     let altered = format!("{HEADER_B64}.{altered_payload}.{SIGNATURE_B64}");
-    assert!(!verify_jws(&altered, &rfc_key()).expect("well-formed"));
+    assert!(verify_jws(&altered, &rfc_key()).is_err());
 }
 
 /// The RFC's public key, as this crate holds one.

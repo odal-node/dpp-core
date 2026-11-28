@@ -212,7 +212,7 @@ const RFC7515_A4_JWS: &str = concat!(
 #[test]
 fn the_rfc7515_es512_example_verifies_and_an_altered_payload_does_not() {
     let key = rfc7515_p521_key();
-    assert!(verify_jws(RFC7515_A4_JWS, &key).expect("well-formed"));
+    verify_jws(RFC7515_A4_JWS, &key).expect("well-formed");
 
     let signature = B64
         .decode(RFC7515_A4_JWS.rsplit('.').next().expect("signature"))
@@ -224,7 +224,7 @@ fn the_rfc7515_es512_example_verifies_and_an_altered_payload_does_not() {
     );
 
     let altered = RFC7515_A4_JWS.replacen("UGF5bG9hZA", "UGF5bG9hZB", 1);
-    assert!(!verify_jws(&altered, &key).expect("well-formed"));
+    assert!(verify_jws(&altered, &key).is_err());
 }
 
 // ── RFC 6979 Appendix A.2.6 and A.2.7 ─────────────────────────────────────────
@@ -365,7 +365,7 @@ fn this_crate_verifies_what_ring_signs_including_high_s_p384() {
             high += 1;
         }
         let jws = format!("{input}.{}", B64.encode(signature.as_ref()));
-        assert!(verify_jws(&jws, &key).expect("well-formed"), "case {i}");
+        assert!(verify_jws(&jws, &key).is_ok(), "case {i}");
     }
     assert!(high > 40, "ring produced {high} high-S signatures of 200");
 }

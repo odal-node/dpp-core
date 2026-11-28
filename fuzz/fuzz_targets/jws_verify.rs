@@ -51,12 +51,10 @@ fuzz_target!(|data: &[u8]| {
         // The fuzzer holds no private key, so nothing it produces is a valid
         // signature under any of them.
         for key in KEYS.iter() {
-            if let Ok(verified) = verify_jws(token, key) {
-                assert!(
-                    !verified,
-                    "verified a token the key never signed: {token:?}"
-                );
-            }
+            assert!(
+                verify_jws(token, key).is_err(),
+                "verified a token the key never signed: {token:?}"
+            );
         }
     }
 });

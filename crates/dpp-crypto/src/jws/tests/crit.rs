@@ -40,7 +40,7 @@ fn accepted(store: &KeyStore, jws: &str) -> [bool; 2] {
     let key = store.load_key(KEY_ID).expect("load key");
     let public_key = key.public_key();
     [
-        verify_jws(jws, &public_key).expect("well-formed input"),
+        verify_jws(jws, &public_key).is_ok(),
         signer::verify(store, KEY_ID, jws).expect("well-formed input"),
     ]
 }

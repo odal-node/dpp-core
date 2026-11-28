@@ -54,7 +54,7 @@ fn disagreements(file: &Value) -> Vec<String> {
                     return Err(super::common::NOT_A_KEY.to_owned());
                 };
                 match verify_jws(sd_jwt.jwt(), &issuer_key) {
-                    Ok(true) => {}
+                    Ok(()) => {}
                     other => return Err(format!("signature: {other:?}")),
                 }
                 let payload = match challenge(&case["challenge"]) {
