@@ -26,6 +26,9 @@ pub fn did_for(base_url: &str) -> String {
 /// signatures produced with rotated keys remain verifiable. Every method is
 /// listed in `assertionMethod`; only the primary is in `authentication`.
 ///
+/// This function only reads from `store`. Callers must provision the issuer's
+/// key during application startup before serving this document.
+///
 /// **A revoked key is never listed, the current one included**, so the document
 /// publishes the same keys as [`build_issuer_metadata`]. A store's own calls never
 /// leave its current key revoked, but a store whose file says so opens: one written
@@ -33,11 +36,12 @@ pub fn did_for(base_url: &str) -> String {
 /// [`KeyStore::open_and_migrate`](dpp_crypto::keystore::KeyStore::open_and_migrate). Such a key signs nothing either
 /// ([`KeyRevoked`](dpp_crypto::keystore::KeyRevoked)).
 ///
-/// With no current key, `authentication` is left out rather than empty: DID Core
+/// With no usable current key, `authentication` is left out rather than empty: DID Core
 /// 1.0 §5.3.1 says that if it is present, "the associated value MUST be a set of
 /// one or more verification methods", and §5.3.2 says the same of `assertionMethod`.
-/// With no key at all, `verificationMethod` and `assertionMethod` are left out too,
-/// and the document holds its `@context` and `id` alone.
+/// If the current key is missing, this function returns an error. When the current
+/// key and all archived keys are revoked, `verificationMethod` and `assertionMethod`
+/// are left out, and the document holds its `@context` and `id` alone.
 ///
 /// [`build_issuer_metadata`]: crate::sd_jwt_vc::build_issuer_metadata
 pub fn build_did_document(
@@ -45,10 +49,6 @@ pub fn build_did_document(
     base_url: &str,
     key_id: &str,
 ) -> anyhow::Result<Value> {
-    if !store.has_key(key_id) {
-        store.generate_key(key_id)?;
-    }
-
     // Only the public key is needed to build a DID document — read it
     // directly from the store's plaintext `verifying_key_hex` rather than
     // decrypting the private signing key just to derive it back.
